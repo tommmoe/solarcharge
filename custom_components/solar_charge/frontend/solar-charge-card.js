@@ -1,4 +1,4 @@
-const h = [
+const g = [
   { label: "Off", option: "Off" },
   { label: "Solar", option: "Solar only" },
   { label: "Free", option: "Free hours only" },
@@ -28,13 +28,13 @@ const h = [
 class u extends HTMLElement {
   constructor() {
     var t;
-    super(), this.attachShadow({ mode: "open" }), (t = this.shadowRoot) == null || t.addEventListener("click", (r) => {
-      this._handleClick(r);
+    super(), this.attachShadow({ mode: "open" }), (t = this.shadowRoot) == null || t.addEventListener("click", (e) => {
+      this._handleClick(e);
     });
   }
   setConfig(t) {
-    var r;
-    if (!t.entity && !((r = t.entities) != null && r.status))
+    var e;
+    if (!t.entity && !((e = t.entities) != null && e.status))
       throw new Error("Solar Charge card requires an entity or entities.status");
     this._config = {
       title: "Solar Charge",
@@ -57,40 +57,40 @@ class u extends HTMLElement {
     };
   }
   async _handleClick(t) {
-    const r = t.composedPath().find(
+    const e = t.composedPath().find(
       (o) => o instanceof HTMLElement && o.dataset.action
     );
-    if (!r || !this._hass)
+    if (!e || !this._hass)
       return;
-    const e = this._entities(), a = r.dataset.action;
+    const r = this._entities(), a = e.dataset.action;
     if (a === "mode") {
-      const o = r.dataset.option;
-      if (!o || !e.mode)
+      const o = e.dataset.option;
+      if (!o || !r.mode)
         return;
       await this._hass.callService("select", "select_option", {
-        entity_id: e.mode,
+        entity_id: r.mode,
         option: o
       });
       return;
     }
-    if (a === "toggle-control" && e.controlEnabled) {
-      const o = this._isOn(e.controlEnabled);
+    if (a === "toggle-control" && r.controlEnabled) {
+      const o = this._isOn(r.controlEnabled);
       await this._hass.callService("switch", o ? "turn_off" : "turn_on", {
-        entity_id: e.controlEnabled
+        entity_id: r.controlEnabled
       });
     }
   }
   _render() {
     if (!this.shadowRoot || !this._config)
       return;
-    const t = this._entities(), r = this._stateText(t.status), e = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), d = this._number(t.gridImport), n = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = n ? a ? "active" : "idle" : "danger", g = this._config.show_controls !== !1;
+    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), c = this._number(t.gridImport), n = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = n ? a ? "active" : "idle" : "danger", h = this._config.show_controls !== !1;
     this.shadowRoot.innerHTML = `
       <style>${f}</style>
       <article class="card ${p}">
         <header class="header">
           <div>
             <h2>${s(this._config.title || "Solar Charge")}</h2>
-            <p>${s(r)}</p>
+            <p>${s(e)}</p>
           </div>
           <div class="status-pill ${p}">
             <span></span>
@@ -110,7 +110,7 @@ class u extends HTMLElement {
         </section>
 
         <section class="primary">
-          ${this._metric("Grid", this._formatPower(t.gridImport), d < 0 ? "exporting" : "importing")}
+          ${this._metric("Grid", this._formatPower(t.gridImport), c < 0 ? "exporting" : "importing")}
           ${this._metric("EV charging", this._formatPower(t.chargerPower), "live charger load")}
           ${this._metric("Target", this._formatCurrent(t.targetAmps), "calculated limit")}
         </section>
@@ -127,7 +127,7 @@ class u extends HTMLElement {
 
         <section class="reason">
           <span class="label">Reason</span>
-          <p>${s(e)}</p>
+          <p>${s(r)}</p>
         </section>
 
         <section class="safety">
@@ -137,17 +137,17 @@ class u extends HTMLElement {
           ${this._safetyItem("Free window", this._isOn(t.inFreeWindow))}
         </section>
 
-        ${g ? `<section class="controls">
+        ${h ? `<section class="controls">
                 <div class="mode-buttons">
-                  ${h.map(
-      (c) => `
+                  ${g.map(
+      (d) => `
                       <button
-                        class="${i === c.option ? "selected" : ""}"
+                        class="${i === d.option ? "selected" : ""}"
                         data-action="mode"
-                        data-option="${c.option}"
+                        data-option="${d.option}"
                         type="button"
                       >
-                        ${c.label}
+                        ${d.label}
                       </button>
                     `
     ).join("")}
@@ -165,70 +165,70 @@ class u extends HTMLElement {
   }
   _entities() {
     var a, o;
-    const t = ((a = this._config) == null ? void 0 : a.entities) || {}, r = this._baseObjectId(), e = {};
+    const t = ((a = this._config) == null ? void 0 : a.entities) || {}, e = this._baseObjectId(), r = {};
     for (const i of Object.keys(m)) {
-      const [d, n] = m[i];
-      e[i] = t[i] || (r ? `${d}.${r}_${n}` : void 0);
+      const [c, n] = m[i];
+      r[i] = t[i] || (e ? `${c}.${e}_${n}` : void 0);
     }
-    return (o = this._config) != null && o.entity && (e.status = t.status || this._config.entity), e;
+    return (o = this._config) != null && o.entity && (r.status = t.status || this._config.entity), r;
   }
   _baseObjectId() {
-    var e, a, o;
-    const t = ((a = (e = this._config) == null ? void 0 : e.entities) == null ? void 0 : a.status) || ((o = this._config) == null ? void 0 : o.entity);
+    var r, a, o;
+    const t = ((a = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : a.status) || ((o = this._config) == null ? void 0 : o.entity);
     if (!t)
       return;
-    const r = t.split(".")[1];
-    if (r)
-      return r.endsWith("_status") ? r.slice(0, -7) : r;
+    const e = t.split(".")[1];
+    if (e)
+      return e.endsWith("_status") ? e.slice(0, -7) : e;
   }
-  _metric(t, r, e) {
+  _metric(t, e, r) {
     return `
       <div class="metric">
         <span class="label">${s(t)}</span>
-        <strong>${s(r)}</strong>
-        <small>${s(e)}</small>
+        <strong>${s(e)}</strong>
+        <small>${s(r)}</small>
       </div>
     `;
   }
-  _safetyItem(t, r) {
+  _safetyItem(t, e) {
     return `
-      <div class="safety-item ${r ? "ok" : "bad"}">
+      <div class="safety-item ${e ? "ok" : "bad"}">
         <span></span>
         ${s(t)}
       </div>
     `;
   }
   _state(t) {
-    var r;
-    return t ? (r = this._hass) == null ? void 0 : r.states[t] : void 0;
+    var e;
+    return t ? (e = this._hass) == null ? void 0 : e.states[t] : void 0;
   }
   _stateText(t) {
-    const r = this._state(t);
-    return !r || r.state === "unknown" || r.state === "unavailable" ? "-" : r.state;
+    const e = this._state(t);
+    return !e || e.state === "unknown" || e.state === "unavailable" ? "-" : e.state;
   }
   _isOn(t) {
-    var r;
-    return ((r = this._state(t)) == null ? void 0 : r.state) === "on";
+    var e;
+    return ((e = this._state(t)) == null ? void 0 : e.state) === "on";
   }
   _number(t) {
-    var e;
-    const r = Number((e = this._state(t)) == null ? void 0 : e.state);
-    return Number.isFinite(r) ? r : 0;
+    var r;
+    const e = Number((r = this._state(t)) == null ? void 0 : r.state);
+    return Number.isFinite(e) ? e : 0;
   }
   _formatPower(t) {
-    const r = this._state(t), e = Number(r == null ? void 0 : r.state);
-    if (!r || !Number.isFinite(e))
+    const e = this._state(t), r = Number(e == null ? void 0 : e.state);
+    if (!e || !Number.isFinite(r))
       return "-";
-    const o = String(r.attributes.unit_of_measurement || "W").toLowerCase() === "kw" ? e * 1e3 : e;
+    const o = String(e.attributes.unit_of_measurement || "W").toLowerCase() === "kw" ? r * 1e3 : r;
     return Math.abs(o) >= 1e3 ? `${(o / 1e3).toFixed(1)} kW` : `${Math.round(o)} W`;
   }
   _formatCurrent(t) {
-    const r = this._state(t), e = Number(r == null ? void 0 : r.state);
-    return !r || !Number.isFinite(e) ? "-" : `${Math.abs(e - Math.round(e)) < 0.05 ? Math.round(e).toString() : e.toFixed(1)} A`;
+    const e = this._state(t), r = Number(e == null ? void 0 : e.state);
+    return !e || !Number.isFinite(r) ? "-" : `${Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r).toString() : r.toFixed(1)} A`;
   }
   _formatPercent(t) {
-    const r = this._state(t), e = Number(r == null ? void 0 : r.state);
-    return !r || !Number.isFinite(e) ? "-" : `${Math.round(e)}%`;
+    const e = this._state(t), r = Number(e == null ? void 0 : e.state);
+    return !e || !Number.isFinite(r) ? "-" : `${Math.round(r)}%`;
   }
 }
 const f = `
