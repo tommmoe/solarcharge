@@ -1,0 +1,12 @@
+# Auto detect text files and normalize to LF
+* text=auto eol=lf
+
+# Explicitly declare Python files as text
+*.py text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Denote binary files
+*.png binary
+*.jpg binary

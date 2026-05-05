@@ -115,6 +115,51 @@ Default safety values for the first target setup:
 - Sensor stale timeout: `120 s`
 - Free window: `11:00` to `14:00`
 
+## Lovelace Card
+
+The repo includes a custom Lovelace card in `frontend/`.
+
+Ready-to-use build:
+
+```text
+frontend/dist/solar-charge-card.js
+```
+
+Development source:
+
+```text
+frontend/solar-charge-card.ts
+```
+
+Add the built JavaScript file as a Lovelace resource:
+
+```yaml
+url: /local/solar-charge-card.js
+type: module
+```
+
+Basic card config:
+
+```yaml
+type: custom:solar-charge-card
+entity: sensor.solar_charge_status
+title: Garage EV Charging
+show_controls: true
+```
+
+The card derives related entity IDs from the status sensor. For example, `sensor.solar_charge_status` maps to `sensor.solar_charge_target_amps`, `binary_sensor.solar_charge_allowed_to_charge`, `select.solar_charge_mode`, and `switch.solar_charge_control_enabled`.
+
+If Home Assistant assigns different entity IDs, override only the ones that differ:
+
+```yaml
+type: custom:solar-charge-card
+entity: sensor.solar_charge_status
+entities:
+  targetAmps: sensor.garage_ev_target_amps
+  mode: select.garage_ev_mode
+  controlEnabled: switch.garage_ev_control_enabled
+```
+
 ## Development
 
 Install test dependencies and run:
@@ -125,3 +170,10 @@ pytest
 
 The calculation engine lives in `custom_components/solar_charge/calculations.py` and has no Home Assistant imports.
 
+Build the Lovelace card:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
