@@ -7,6 +7,9 @@ from homeassistant.const import Platform
 DOMAIN = "solar_charge"
 VERSION = "0.1.0"
 DEFAULT_NAME = "Solar Charge"
+FRONTEND_PATH = f"/{DOMAIN}"
+FRONTEND_CARD_FILENAME = "solar-charge-card.js"
+FRONTEND_CARD_URL = f"{FRONTEND_PATH}/{FRONTEND_CARD_FILENAME}"
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -129,4 +132,3 @@ SERVICE_SET_MODE = "set_mode"
 
 ATTR_ENTRY_ID = "entry_id"
 ATTR_MODE = "mode"
-

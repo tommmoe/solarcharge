@@ -7,7 +7,7 @@ export default defineConfig({
       formats: ["es"],
       fileName: () => "solar-charge-card.js",
     },
-    outDir: "dist",
+    outDir: "../custom_components/solar_charge/frontend",
     emptyOutDir: true,
     rollupOptions: {
       output: {

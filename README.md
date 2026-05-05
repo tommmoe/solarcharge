@@ -82,11 +82,12 @@ If a source sensor needs scaling, configure the integration's multiplier instead
 
 ### HACS Custom Repository
 
-1. Add this repository as a HACS custom repository.
-2. Choose category: Integration.
-3. Install Solar Charge.
-4. Restart Home Assistant.
-5. Add the integration from Settings -> Devices & services.
+1. Push this repository to GitHub.
+2. Add the GitHub repository URL to HACS as a custom repository.
+3. Choose category: Integration.
+4. Install Solar Charge.
+5. Restart Home Assistant.
+6. Add the integration from Settings -> Devices & services.
 
 ### Manual
 
@@ -117,26 +118,16 @@ Default safety values for the first target setup:
 
 ## Lovelace Card
 
-The repo includes a custom Lovelace card in `frontend/`.
+The repo includes a custom Lovelace card. When installed through HACS as an integration, the card JavaScript is bundled inside `custom_components/solar_charge/frontend/` and served by Home Assistant.
 
-Ready-to-use build:
-
-```text
-frontend/dist/solar-charge-card.js
-```
-
-Development source:
-
-```text
-frontend/solar-charge-card.ts
-```
-
-Add the built JavaScript file as a Lovelace resource:
+Add this Lovelace resource after installing and restarting Home Assistant:
 
 ```yaml
-url: /local/solar-charge-card.js
+url: /solar_charge/solar-charge-card.js
 type: module
 ```
+
+No manual copy into `/config/www` is needed.
 
 Basic card config:
 
@@ -177,3 +168,5 @@ cd frontend
 npm install
 npm run build
 ```
+
+The build output is written to `custom_components/solar_charge/frontend/solar-charge-card.js` so HACS includes it with the integration.

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
@@ -16,6 +18,7 @@ from .const import (
     ATTR_ENTRY_ID,
     ATTR_MODE,
     DOMAIN,
+    FRONTEND_PATH,
     MODES,
     PLATFORMS,
     SERVICE_APPLY_NOW,
@@ -32,6 +35,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up integration-wide services."""
 
     hass.data.setdefault(DOMAIN, {})
+    await _async_register_frontend_path(hass)
 
     if hass.services.has_service(DOMAIN, SERVICE_FORCE_UPDATE):
         return True
@@ -99,6 +103,18 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     )
 
     return True
+
+
+async def _async_register_frontend_path(hass: HomeAssistant) -> None:
+    """Register the bundled Lovelace card as a static frontend asset."""
+
+    frontend_path = Path(__file__).parent / "frontend"
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(FRONTEND_PATH, str(frontend_path), True)]
+        )
+    except RuntimeError:
+        _LOGGER.debug("Frontend path already registered: %s", FRONTEND_PATH)
 
 
 async def async_setup_entry(
