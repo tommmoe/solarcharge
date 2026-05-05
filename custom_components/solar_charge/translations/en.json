@@ -1,0 +1,112 @@
+{
+  "title": "Solar Charge",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solar Charge",
+        "description": "Choose the integration name and default mode.",
+        "data": {
+          "name": "Name",
+          "mode": "Mode"
+        }
+      },
+      "site": {
+        "title": "Site and inverter",
+        "data": {
+          "grid_power_entity": "Grid import/export power sensor",
+          "grid_power_multiplier": "Grid sensor multiplier",
+          "grid_import_positive": "Grid import is positive",
+          "pv_power_entities": "PV power sensors",
+          "pv_power_multiplier": "PV sensor multiplier",
+          "battery_power_entity": "Battery power sensor",
+          "battery_power_multiplier": "Battery power multiplier",
+          "battery_charging_positive": "Battery charging is positive",
+          "battery_soc_entity": "Battery SOC sensor",
+          "load_power_entity": "Load power sensor"
+        }
+      },
+      "charger": {
+        "title": "Charger",
+        "data": {
+          "charger_current_limit_entity": "Charger maximum current number",
+          "charger_charge_control_entity": "Charger charge control switch",
+          "charger_availability_entity": "Charger availability switch",
+          "charger_power_entity": "Charger power import sensor",
+          "charger_power_multiplier": "Charger power multiplier",
+          "charger_power_unit": "Charger power unit",
+          "charger_current_entity": "Charger actual current sensor",
+          "charger_voltage_entity": "Charger voltage sensor",
+          "charger_current_offered_entity": "Charger offered current sensor",
+          "charger_status_entity": "Charger status sensor"
+        }
+      },
+      "safety": {
+        "title": "Safety settings",
+        "data": {
+          "breaker_limit_amps": "Breaker limit",
+          "safety_margin_amps": "Safety margin",
+          "voltage": "Voltage",
+          "grid_buffer_watts": "Grid buffer",
+          "min_charge_amps": "Minimum charge current",
+          "max_charge_amps": "Maximum charge current",
+          "current_change_threshold_amps": "Current change threshold",
+          "control_interval_seconds": "Control interval",
+          "sensor_stale_seconds": "Sensor stale timeout"
+        }
+      },
+      "window": {
+        "title": "Charging window",
+        "data": {
+          "free_window_start": "Free/cheap window start",
+          "free_window_end": "Free/cheap window end"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Solar Charge options"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "grid_import": { "name": "Grid import" },
+      "charger_power": { "name": "Charger power" },
+      "base_grid_import": { "name": "Base grid import" },
+      "safe_import_limit": { "name": "Safe import limit" },
+      "spare_capacity": { "name": "Spare capacity" },
+      "target_amps": { "name": "Target amps" },
+      "actual_current": { "name": "Actual current" },
+      "offered_current": { "name": "Offered current" },
+      "pv_power": { "name": "PV power" },
+      "battery_soc": { "name": "Battery SOC" },
+      "reason": { "name": "Reason" },
+      "status": { "name": "Status" }
+    },
+    "binary_sensor": {
+      "allowed_to_charge": { "name": "Allowed to charge" },
+      "in_free_window": { "name": "In free window" },
+      "grid_sensor_ok": { "name": "Grid sensor OK" },
+      "charger_sensor_ok": { "name": "Charger sensor OK" },
+      "breaker_limit_ok": { "name": "Breaker limit OK" }
+    },
+    "switch": {
+      "enabled": { "name": "Enabled" },
+      "control_enabled": { "name": "Control enabled" }
+    },
+    "select": {
+      "mode": { "name": "Mode" }
+    },
+    "number": {
+      "breaker_limit_amps": { "name": "Breaker limit" },
+      "safety_margin_amps": { "name": "Safety margin" },
+      "grid_buffer_watts": { "name": "Grid buffer" },
+      "min_charge_amps": { "name": "Minimum charge current" },
+      "max_charge_amps": { "name": "Maximum charge current" },
+      "voltage": { "name": "Voltage" },
+      "current_change_threshold_amps": { "name": "Current change threshold" }
+    }
+  }
+}

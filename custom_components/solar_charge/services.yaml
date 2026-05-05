@@ -1,0 +1,43 @@
+force_update:
+  fields:
+    entry_id:
+      selector:
+        text:
+      required: false
+      example: "01J..."
+
+apply_now:
+  fields:
+    entry_id:
+      selector:
+        text:
+      required: false
+      example: "01J..."
+
+stop_charging:
+  fields:
+    entry_id:
+      selector:
+        text:
+      required: false
+      example: "01J..."
+
+set_mode:
+  fields:
+    entry_id:
+      selector:
+        text:
+      required: false
+      example: "01J..."
+    mode:
+      required: true
+      selector:
+        select:
+          options:
+            - "off"
+            - "free_hours_only"
+            - "solar_only"
+            - "free_hours_or_solar"
+            - "force_charge"
+            - "manual"
+
