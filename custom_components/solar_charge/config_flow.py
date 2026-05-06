@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.helpers import selector
+
+_LOGGER = logging.getLogger(__name__)
 
 from .const import (
     CONF_BATTERY_CHARGING_POSITIVE,
@@ -74,19 +77,25 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
         """Collect name."""
+        
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Set default mode and continue
-            user_input[CONF_MODE] = MODE_FREE_HOURS_OR_SOLAR
-            self._data.update(user_input)
-            return await self.async_step_site()
+            try:
+                # Set default mode and continue
+                user_input[CONF_MODE] = MODE_FREE_HOURS_OR_SOLAR
+                self._data.update(user_input)
+                return await self.async_step_site()
+            except Exception as err:
+                _LOGGER.exception("Error in user step: %s", err)
+                errors["base"] = "unknown"
 
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
             }
         )
-        return self.async_show_form(step_id="user", data_schema=schema)
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_site(
         self,
@@ -108,7 +117,7 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_GRID_IMPORT_POSITIVE,
                     default=DEFAULTS[CONF_GRID_IMPORT_POSITIVE],
-                ): bool,
+                ): selector.BooleanSelector(),
                 vol.Optional(CONF_PV_POWER_ENTITIES, default=[]): _entity_selector(
                     "sensor", multiple=True
                 ),
@@ -124,7 +133,7 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(
                     CONF_BATTERY_CHARGING_POSITIVE,
                     default=DEFAULTS[CONF_BATTERY_CHARGING_POSITIVE],
-                ): bool,
+                ): selector.BooleanSelector(),
                 vol.Optional(CONF_BATTERY_SOC_ENTITY): _entity_selector("sensor"),
                 vol.Optional(CONF_LOAD_POWER_ENTITY): _entity_selector("sensor"),
             }
@@ -256,14 +265,17 @@ def _number_selector(
     step: float,
     unit: str | None = None,
 ) -> selector.NumberSelector:
+    config = {
+        "min": minimum,
+        "max": maximum,
+        "step": step,
+        "mode": selector.NumberSelectorMode.BOX,
+    }
+    if unit is not None:
+        config["unit_of_measurement"] = unit
+    
     return selector.NumberSelector(
-        selector.NumberSelectorConfig(
-            min=minimum,
-            max=maximum,
-            step=step,
-            mode=selector.NumberSelectorMode.BOX,
-            unit_of_measurement=unit,
-        )
+        selector.NumberSelectorConfig(**config)
     )
 
 
