@@ -1,0 +1,69 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solar Charge Setup",
+        "description": "Choose the integration name and default mode.",
+        "data": {
+          "name": "Name",
+          "mode": "Mode"
+        }
+      },
+      "site": {
+        "title": "Site Configuration",
+        "description": "Configure your site and inverter entities.",
+        "data": {
+          "grid_power_entity": "Grid Power Entity",
+          "grid_power_multiplier": "Grid Power Multiplier",
+          "grid_import_positive": "Grid Import Positive",
+          "pv_power_entities": "PV Power Entities",
+          "pv_power_multiplier": "PV Power Multiplier",
+          "battery_power_entity": "Battery Power Entity",
+          "battery_power_multiplier": "Battery Power Multiplier",
+          "battery_charging_positive": "Battery Charging Positive",
+          "battery_soc_entity": "Battery SOC Entity",
+          "load_power_entity": "Load Power Entity"
+        }
+      },
+      "charger": {
+        "title": "Charger Configuration",
+        "description": "Configure your EV charger entities.",
+        "data": {
+          "charger_current_limit_entity": "Charger Current Limit Entity",
+          "charger_charge_control_entity": "Charger Charge Control Entity",
+          "charger_availability_entity": "Charger Availability Entity",
+          "charger_power_entity": "Charger Power Entity",
+          "charger_power_multiplier": "Charger Power Multiplier",
+          "charger_power_unit": "Charger Power Unit",
+          "charger_current_entity": "Charger Current Entity",
+          "charger_voltage_entity": "Charger Voltage Entity",
+          "charger_current_offered_entity": "Charger Current Offered Entity",
+          "charger_status_entity": "Charger Status Entity"
+        }
+      },
+      "safety": {
+        "title": "Safety Settings",
+        "description": "Configure safety limits and control parameters.",
+        "data": {
+          "breaker_limit_amps": "Breaker Limit (A)",
+          "safety_margin_amps": "Safety Margin (A)",
+          "voltage": "Voltage (V)",
+          "grid_buffer_watts": "Grid Buffer (W)",
+          "min_charge_amps": "Minimum Charge (A)",
+          "max_charge_amps": "Maximum Charge (A)",
+          "current_change_threshold_amps": "Current Change Threshold (A)",
+          "control_interval_seconds": "Control Interval (s)",
+          "sensor_stale_seconds": "Sensor Stale Timeout (s)"
+        }
+      },
+      "window": {
+        "title": "Free Charging Window",
+        "description": "Configure the time window for free charging.",
+        "data": {
+          "free_window_start": "Free Window Start",
+          "free_window_end": "Free Window End"
+        }
+      }
+    }
+  }
+}
