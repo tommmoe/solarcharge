@@ -66,6 +66,18 @@
       }
     }
   },
+  "selector": {
+    "mode": {
+      "options": {
+        "off": "Off",
+        "free_hours_only": "Free hours only",
+        "solar_only": "Solar only",
+        "free_hours_or_solar": "Free hours or solar",
+        "force_charge": "Force charge",
+        "manual": "Manual"
+      }
+    }
+  },
   "options": {
     "step": {
       "init": {

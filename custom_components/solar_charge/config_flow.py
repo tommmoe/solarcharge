@@ -47,7 +47,6 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
     MODE_FREE_HOURS_OR_SOLAR,
-    MODE_NAMES,
     MODES,
     POWER_UNITS,
 )
@@ -85,10 +84,8 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
                 vol.Required(CONF_MODE, default=MODE_FREE_HOURS_OR_SOLAR): selector.SelectSelector(
                     selector.SelectSelectorConfig(
-                        options=[
-                            {"value": mode, "label": MODE_NAMES[mode]}
-                            for mode in MODES
-                        ]
+                        options=list(MODES),
+                        translation_key="mode"
                     )
                 ),
             }
