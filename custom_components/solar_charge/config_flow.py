@@ -73,21 +73,17 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self,
         user_input: dict[str, Any] | None = None,
     ) -> config_entries.ConfigFlowResult:
-        """Collect name and mode."""
+        """Collect name."""
 
         if user_input is not None:
+            # Set default mode and continue
+            user_input[CONF_MODE] = MODE_FREE_HOURS_OR_SOLAR
             self._data.update(user_input)
             return await self.async_step_site()
 
         schema = vol.Schema(
             {
                 vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
-                vol.Required(CONF_MODE, default=MODE_FREE_HOURS_OR_SOLAR): selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=list(MODES),
-                        translation_key="mode"
-                    )
-                ),
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema)

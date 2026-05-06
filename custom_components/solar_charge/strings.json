@@ -3,10 +3,9 @@
     "step": {
       "user": {
         "title": "Solar Charge Setup",
-        "description": "Choose the integration name and default mode.",
+        "description": "Enter a name for this Solar Charge instance. Default mode will be 'Free hours or solar' - you can change it later.",
         "data": {
-          "name": "Name",
-          "mode": "Mode"
+          "name": "Name"
         }
       },
       "site": {
