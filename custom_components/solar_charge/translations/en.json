@@ -8,6 +8,9 @@
         "data": {
           "name": "Name",
           "mode": "Mode"
+        },
+        "data_description": {
+          "mode": "Select the default charging mode for this instance"
         }
       },
       "site": {
