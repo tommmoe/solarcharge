@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.const import Platform
 
 DOMAIN = "solar_charge"
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 DEFAULT_NAME = "Solar Charge"
 FRONTEND_PATH = f"/{DOMAIN}"
 FRONTEND_CARD_FILENAME = "solar-charge-card.js"
