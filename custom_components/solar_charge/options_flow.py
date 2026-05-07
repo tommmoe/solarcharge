@@ -49,9 +49,29 @@ from .const import (
     CONF_STOP_DELAY_SECONDS,
     CONF_VOLTAGE,
     DEFAULTS,
+    MODE_NAMES,
     MODES,
     POWER_UNITS,
 )
+
+
+def _time_selector_default(raw: Any) -> dict[str, int]:
+    """TimeSelector defaults must use hours/minutes/seconds dicts, not \"HH:MM\" strings."""
+
+    if isinstance(raw, dict):
+        return {
+            "hours": int(raw.get("hours", 0)),
+            "minutes": int(raw.get("minutes", 0)),
+            "seconds": int(raw.get("seconds", 0)),
+        }
+    if isinstance(raw, str) and ":" in raw:
+        parts = raw.split(":")
+        return {
+            "hours": int(parts[0]),
+            "minutes": int(parts[1]) if len(parts) > 1 else 0,
+            "seconds": int(parts[2]) if len(parts) > 2 else 0,
+        }
+    return {"hours": 0, "minutes": 0, "seconds": 0}
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
@@ -70,13 +90,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_ENABLED, default=values[CONF_ENABLED]): bool,
+                vol.Required(
+                    CONF_ENABLED, default=values[CONF_ENABLED]
+                ): selector.BooleanSelector(),
                 vol.Required(
                     CONF_CONTROL_ENABLED,
                     default=values[CONF_CONTROL_ENABLED],
-                ): bool,
+                ): selector.BooleanSelector(),
                 vol.Required(CONF_MODE, default=values[CONF_MODE]): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=list(MODES))
+                    selector.SelectSelectorConfig(
+                        options=[
+                            {"value": mode, "label": MODE_NAMES[mode]} for mode in MODES
+                        ],
+                    ),
                 ),
                 vol.Required(
                     CONF_GRID_POWER_ENTITY,
@@ -89,7 +115,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_GRID_IMPORT_POSITIVE,
                     default=values[CONF_GRID_IMPORT_POSITIVE],
-                ): bool,
+                ): selector.BooleanSelector(),
                 vol.Optional(
                     CONF_PV_POWER_ENTITIES,
                     default=values.get(CONF_PV_POWER_ENTITIES, []),
@@ -109,7 +135,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(
                     CONF_BATTERY_CHARGING_POSITIVE,
                     default=values[CONF_BATTERY_CHARGING_POSITIVE],
-                ): bool,
+                ): selector.BooleanSelector(),
                 vol.Optional(
                     CONF_BATTERY_SOC_ENTITY,
                     default=values.get(CONF_BATTERY_SOC_ENTITY),
@@ -142,7 +168,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_CHARGER_POWER_UNIT,
                     default=values[CONF_CHARGER_POWER_UNIT],
                 ): selector.SelectSelector(
-                    selector.SelectSelectorConfig(options=list(POWER_UNITS))
+                    selector.SelectSelectorConfig(
+                        options=[{"value": u, "label": u} for u in POWER_UNITS],
+                    ),
                 ),
                 vol.Optional(
                     CONF_CHARGER_CURRENT_ENTITY,
@@ -185,15 +213,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): _number_selector(1, 80, 1, "A"),
                 vol.Required(
                     CONF_FREE_WINDOW_START,
-                    default=values[CONF_FREE_WINDOW_START],
+                    default=_time_selector_default(values[CONF_FREE_WINDOW_START]),
                 ): selector.TimeSelector(),
                 vol.Required(
                     CONF_FREE_WINDOW_END,
-                    default=values[CONF_FREE_WINDOW_END],
+                    default=_time_selector_default(values[CONF_FREE_WINDOW_END]),
                 ): selector.TimeSelector(),
                 vol.Optional(
                     CONF_BATTERY_RESERVE_PCT,
-                    default=values.get(CONF_BATTERY_RESERVE_PCT),
+                    default=(
+                        float(values[CONF_BATTERY_RESERVE_PCT])
+                        if values.get(CONF_BATTERY_RESERVE_PCT) is not None
+                        else 0.0
+                    ),
                 ): _number_selector(0, 100, 1, "%"),
                 vol.Required(
                     CONF_START_DELAY_SECONDS,

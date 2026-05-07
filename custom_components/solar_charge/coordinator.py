@@ -392,10 +392,16 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return "Waiting"
 
 
-def _parse_time(value: str) -> time:
+def _parse_time(value: Any) -> time:
     if not value:
         return time(0, 0)
-    parts = value.split(":")
+    if isinstance(value, dict):
+        return time(
+            int(value.get("hours", 0)),
+            int(value.get("minutes", 0)),
+            int(value.get("seconds", 0)),
+        )
+    parts = str(value).split(":")
     return time(int(parts[0]), int(parts[1]) if len(parts) > 1 else 0)
 
 
