@@ -8,6 +8,7 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.core import callback
 from homeassistant.helpers import selector
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,12 +66,13 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data: dict[str, Any] = {}
 
     @staticmethod
+    @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
     ) -> OptionsFlowHandler:
         """Create the options flow."""
 
-        return OptionsFlowHandler(config_entry)
+        return OptionsFlowHandler()
 
     async def async_step_user(
         self,
