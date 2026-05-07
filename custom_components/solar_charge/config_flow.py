@@ -72,6 +72,11 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> OptionsFlowHandler:
         """Create the options flow."""
 
+        _LOGGER.info(
+            "Solar Charge: async_get_options_flow entry_id=%s title=%s",
+            config_entry.entry_id,
+            config_entry.title,
+        )
         return OptionsFlowHandler()
 
     async def async_step_user(

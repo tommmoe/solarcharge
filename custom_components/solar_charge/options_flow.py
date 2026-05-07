@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
+import logging
 from typing import Any
 
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.helpers import selector
+
+_LOGGER = logging.getLogger(__name__)
 
 from .const import (
     CONF_BATTERY_CHARGING_POSITIVE,
@@ -74,6 +78,50 @@ def _time_selector_default(raw: Any) -> dict[str, int]:
     return {"hours": 0, "minutes": 0, "seconds": 0}
 
 
+def _summarize_values_for_log(values: dict[str, Any]) -> dict[str, Any]:
+    """Types and short previews for INFO logging (avoid huge blobs)."""
+
+    summary: dict[str, Any] = {}
+    for key, val in sorted(values.items()):
+        if isinstance(val, list):
+            summary[f"{key} (list len={len(val)})"] = val[:5]
+            if len(val) > 5:
+                summary[f"{key}…"] = "(truncated)"
+        else:
+            summary[key] = f"{type(val).__name__}={repr(val)[:120]}"
+    return summary
+
+
+def _try_log_schema_serialization(schema: vol.Schema) -> None:
+    """Same conversion as the config UI uses; failures here often match a 400 in the browser."""
+
+    try:
+        import voluptuous_serialize
+        from homeassistant.helpers import config_validation as cv
+    except ImportError:
+        _LOGGER.debug(
+            "Solar Charge options: skip schema serialization probe (HA imports unavailable)"
+        )
+        return
+    try:
+        data = voluptuous_serialize.convert(
+            schema,
+            custom_serializer=cv.custom_serializer,
+        )
+        _LOGGER.info(
+            "Solar Charge options: data_schema JSON serialization OK (%s keys)",
+            len(data) if hasattr(data, "__len__") else data,
+        )
+        _LOGGER.debug(
+            "Solar Charge options: serialized data_schema=%s",
+            json.dumps(data, default=str)[:8000],
+        )
+    except Exception:
+        _LOGGER.exception(
+            "Solar Charge options: data_schema serialization FAILED "
+            "(matches 'Config flow could not be loaded' / 400 in the UI)"
+        )
+
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle Solar Charge options."""
 
@@ -83,10 +131,34 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """Manage integration options."""
 
+        _LOGGER.info(
+            "Solar Charge options flow: async_step_init entry_id=%s title=%s has_user_input=%s",
+            self.config_entry.entry_id,
+            self.config_entry.title,
+            user_input is not None,
+        )
+
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            _LOGGER.info(
+                "Solar Charge options flow: submitting options (%d keys): %s",
+                len(user_input),
+                sorted(user_input.keys()),
+            )
+            try:
+                return self.async_create_entry(title="", data=user_input)
+            except Exception:
+                _LOGGER.exception("Solar Charge options flow: async_create_entry failed")
+                raise
 
         values = {**DEFAULTS, **self.config_entry.data, **self.config_entry.options}
+        _LOGGER.info(
+            "Solar Charge options flow: merged settings (%d keys)",
+            len(values),
+        )
+        _LOGGER.debug(
+            "Solar Charge options flow: merged summary=%s",
+            _summarize_values_for_log(values),
+        )
 
         schema = vol.Schema(
             {
@@ -253,7 +325,20 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 ): _number_selector(10, 3600, 5, "s"),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        _try_log_schema_serialization(schema)
+        try:
+            result = self.async_show_form(step_id="init", data_schema=schema)
+            step = result.get("step_id") if isinstance(result, dict) else None
+            typ = result.get("type") if isinstance(result, dict) else None
+            _LOGGER.info(
+                "Solar Charge options flow: async_show_form ok step_id=%s type=%s",
+                step,
+                typ,
+            )
+            return result
+        except Exception:
+            _LOGGER.exception("Solar Charge options flow: async_show_form failed")
+            raise
 
 
 def _entity_selector(domain: str, multiple: bool = False) -> selector.EntitySelector:
