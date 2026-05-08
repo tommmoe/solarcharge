@@ -1,0 +1,58 @@
+# Example Solar Charge Card Configuration
+# Add this to your Lovelace dashboard YAML
+
+# Basic configuration (recommended)
+type: custom:solar-charge-card
+entity: sensor.solar_charge_status
+title: "EV Charging"
+show_controls: true
+
+---
+
+# Advanced configuration with custom entities
+type: custom:solar-charge-card
+title: "Garage EV Charging"
+show_controls: true
+entities:
+  # Status and reason
+  status: sensor.solar_charge_status
+  reason: sensor.solar_charge_reason
+  
+  # Power measurements
+  gridImport: sensor.solar_charge_grid_import
+  chargerPower: sensor.solar_charge_charger_power
+  baseGridImport: sensor.solar_charge_base_grid_import
+  safeImportLimit: sensor.solar_charge_safe_import_limit
+  spareCapacity: sensor.solar_charge_spare_capacity
+  pvPower: sensor.solar_charge_pv_power
+  loadPower: sensor.solar_charge_load_power
+  
+  # Current measurements
+  targetAmps: sensor.solar_charge_target_amps
+  actualCurrent: sensor.solar_charge_actual_current
+  offeredCurrent: sensor.solar_charge_offered_current
+  
+  # Battery
+  batterySoc: sensor.solar_charge_battery_soc
+  
+  # Charger status
+  chargerStatus: sensor.solar_charge_charger_status
+  
+  # Binary sensors (safety checks)
+  allowedToCharge: binary_sensor.solar_charge_allowed_to_charge
+  inFreeWindow: binary_sensor.solar_charge_in_free_window
+  gridSensorOk: binary_sensor.solar_charge_grid_sensor_ok
+  chargerSensorOk: binary_sensor.solar_charge_charger_sensor_ok
+  breakerLimitOk: binary_sensor.solar_charge_breaker_limit_ok
+  
+  # Controls
+  mode: select.solar_charge_mode
+  controlEnabled: switch.solar_charge_control_enabled
+
+---
+
+# Minimal configuration (controls hidden)
+type: custom:solar-charge-card
+entity: sensor.solar_charge_status
+title: "Solar Charging Status"
+show_controls: false

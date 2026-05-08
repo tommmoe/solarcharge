@@ -187,6 +187,10 @@ class SolarChargeCard extends HTMLElement {
           </div>
         </header>
 
+        <section class="power-flow">
+          ${this._renderPowerFlow(entities)}
+        </section>
+
         <section class="mode-row">
           <div>
             <span class="label">Mode</span>
@@ -259,6 +263,107 @@ class SolarChargeCard extends HTMLElement {
             : ""
         }
       </article>
+    `;
+  }
+
+  private _renderPowerFlow(entities: Record<EntityKey, string | undefined>): string {
+    const pvPower = this._number(entities.pvPower);
+    const gridPower = this._number(entities.gridImport);
+    const batteryPower = this._number(entities.chargerPower);
+    const loadPower = this._number(entities.loadPower);
+    const batterySoc = this._number(entities.batterySoc);
+
+    // Determine flow directions
+    const pvActive = pvPower > 50;
+    const gridActive = Math.abs(gridPower) > 50;
+    const gridExporting = gridPower < -50;
+    const batteryCharging = batteryPower > 50;
+    const loadActive = loadPower > 50;
+
+    return `
+      <div class="flow-diagram">
+        <!-- Solar -->
+        <div class="flow-node solar ${pvActive ? 'active' : ''}">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M11.45 2v3.55L15 3l-1 4 3.6-1.6-2.2 3.6L20 7l-3.4 3L20 13h-3.4l2.2 3.6L15 15l1 4-3.55-2.5V20h-1v-3.55L8 19l1-4-3.6 1.6 2.2-3.6L4 15l3.4-3L4 9h3.4L5.2 5.4 9 7 8 3l3.45 2.55V2h1z" fill="currentColor"/></svg>
+          </div>
+          <div class="flow-value">${this._formatPower(entities.pvPower)}</div>
+          <div class="flow-label">Production</div>
+        </div>
+
+        <!-- Grid -->
+        <div class="flow-node grid ${gridActive ? (gridExporting ? 'exporting' : 'importing') : ''}">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M14,2L20,8V10H14V16H20V18L14,24V22H10V18H4V16L2,14L4,12V6H10V2H14M12,4H10V12H4V14H10V20H12V14H18V12H12V4Z" fill="currentColor"/></svg>
+          </div>
+          <div class="flow-value">${this._formatPower(entities.gridImport)}</div>
+          <div class="flow-label">${gridExporting ? 'Export' : 'Grid'}</div>
+        </div>
+
+        <!-- Center Home -->
+        <div class="flow-node home">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <!-- Battery/Charger -->
+        <div class="flow-node battery ${batteryCharging ? 'active' : ''}">
+          <div class="flow-icon">
+            ${this._batteryIcon(batterySoc)}
+          </div>
+          <div class="flow-value">${this._formatPower(entities.chargerPower)}</div>
+          <div class="flow-label">EV Charger</div>
+        </div>
+
+        <!-- Load -->
+        <div class="flow-node load ${loadActive ? 'active' : ''}">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z" fill="currentColor"/></svg>
+          </div>
+          <div class="flow-value">${this._formatPower(entities.loadPower)}</div>
+          <div class="flow-label">Load</div>
+        </div>
+
+        <!-- Flow lines -->
+        <svg class="flow-lines" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+          <!-- Solar to Home -->
+          <line x1="100" y1="75" x2="200" y2="150" class="flow-line ${pvActive ? 'active' : ''}" stroke-dasharray="4 4">
+            ${pvActive ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+          
+          <!-- Grid to Home -->
+          <line x1="300" y1="75" x2="200" y2="150" class="flow-line ${gridActive && !gridExporting ? 'active' : ''}" stroke-dasharray="4 4">
+            ${gridActive && !gridExporting ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+          
+          <!-- Home to Grid (export) -->
+          <line x1="200" y1="150" x2="300" y2="75" class="flow-line ${gridExporting ? 'active export' : ''}" stroke-dasharray="4 4">
+            ${gridExporting ? '<animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+          
+          <!-- Home to Battery/Charger -->
+          <line x1="200" y1="150" x2="100" y2="225" class="flow-line ${batteryCharging ? 'active' : ''}" stroke-dasharray="4 4">
+            ${batteryCharging ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+          
+          <!-- Home to Load -->
+          <line x1="200" y1="150" x2="300" y2="225" class="flow-line ${loadActive ? 'active' : ''}" stroke-dasharray="4 4">
+            ${loadActive ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+        </svg>
+      </div>
+    `;
+  }
+
+  private _batteryIcon(soc: number): string {
+    const level = Math.round(soc / 25) * 25; // Round to 0, 25, 50, 75, 100
+    return `
+      <svg viewBox="0 0 24 24">
+        <path d="M16 18H8V6h8M16.67 4H15V2H9v2H7.33A1.33 1.33 0 0 0 6 5.33v15.33A1.34 1.34 0 0 0 7.33 22h9.34A1.34 1.34 0 0 0 18 20.67V5.33A1.33 1.33 0 0 0 16.67 4z" fill="currentColor" opacity="0.3"/>
+        <path d="M8 ${6 + (100 - level) * 0.12}h8v${level * 0.12}" fill="currentColor"/>
+        <text x="12" y="13" text-anchor="middle" font-size="6" fill="currentColor" font-weight="bold">${Math.round(soc)}%</text>
+      </svg>
     `;
   }
 
@@ -429,8 +534,137 @@ const CARD_CSS = `
     background: #c24135;
   }
 
+  .power-flow {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    background: linear-gradient(to bottom, rgba(240, 243, 246, 0.4), transparent);
+  }
+
+  .flow-diagram {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .flow-node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+  }
+
+  .flow-node.solar {
+    top: 0;
+    left: 10%;
+  }
+
+  .flow-node.grid {
+    top: 0;
+    right: 10%;
+  }
+
+  .flow-node.home {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .flow-node.battery {
+    bottom: 0;
+    left: 10%;
+  }
+
+  .flow-node.load {
+    bottom: 0;
+    right: 10%;
+  }
+
+  .flow-icon {
+    width: 56px;
+    height: 56px;
+    padding: 12px;
+    border-radius: 50%;
+    background: var(--card-background-color, #fff);
+    border: 2px solid var(--divider-color, rgba(127, 127, 127, 0.22));
+    color: var(--secondary-text-color, #667085);
+    transition: all 0.3s ease;
+  }
+
+  .flow-node.home .flow-icon {
+    width: 64px;
+    height: 64px;
+    border-width: 3px;
+    border-color: var(--primary-color, #1d6f9f);
+    color: var(--primary-color, #1d6f9f);
+  }
+
+  .flow-node.active .flow-icon {
+    border-color: #14866d;
+    color: #14866d;
+    background: rgba(20, 134, 109, 0.08);
+    box-shadow: 0 0 0 4px rgba(20, 134, 109, 0.12);
+  }
+
+  .flow-node.exporting .flow-icon {
+    border-color: #2563eb;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.08);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  .flow-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .flow-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary-text-color, #1f2933);
+    white-space: nowrap;
+  }
+
+  .flow-label {
+    font-size: 0.75rem;
+    color: var(--secondary-text-color, #667085);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+  }
+
+  .flow-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .flow-line {
+    stroke: var(--divider-color, rgba(127, 127, 127, 0.3));
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.3s ease;
+  }
+
+  .flow-line.active {
+    stroke: #14866d;
+    stroke-width: 3;
+  }
+
+  .flow-line.export {
+    stroke: #2563eb;
+  }
+
   .header,
   .mode-row,
+  .power-flow,
   .primary,
   .metrics,
   .reason,
@@ -667,6 +901,25 @@ const CARD_CSS = `
 
     .status-pill {
       width: fit-content;
+    }
+
+    .flow-icon {
+      width: 48px;
+      height: 48px;
+      padding: 10px;
+    }
+
+    .flow-node.home .flow-icon {
+      width: 56px;
+      height: 56px;
+    }
+
+    .flow-value {
+      font-size: 0.85rem;
+    }
+
+    .flow-label {
+      font-size: 0.68rem;
     }
 
     .primary,

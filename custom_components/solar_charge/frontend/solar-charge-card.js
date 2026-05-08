@@ -1,10 +1,10 @@
-const f = [
+const u = [
   { label: "Off", option: "Off" },
   { label: "Solar", option: "Solar only" },
   { label: "Free", option: "Free hours only" },
   { label: "Hybrid", option: "Free hours or solar" },
   { label: "Force", option: "Force charge" }
-], h = {
+], m = {
   status: ["sensor", "status"],
   reason: ["sensor", "reason"],
   gridImport: ["sensor", "grid_import"],
@@ -64,8 +64,8 @@ class b extends HTMLElement {
     );
     if (!e || !this._hass)
       return;
-    const r = this._entities(), s = e.dataset.action;
-    if (s === "mode") {
+    const r = this._entities(), a = e.dataset.action;
+    if (a === "mode") {
       const o = e.dataset.option;
       if (!o || !r.mode)
         return;
@@ -75,7 +75,7 @@ class b extends HTMLElement {
       });
       return;
     }
-    if (s === "toggle-control" && r.controlEnabled) {
+    if (a === "toggle-control" && r.controlEnabled) {
       const o = this._isOn(r.controlEnabled);
       await this._hass.callService("switch", o ? "turn_off" : "turn_on", {
         entity_id: r.controlEnabled
@@ -85,25 +85,29 @@ class b extends HTMLElement {
   _render() {
     if (!this.shadowRoot || !this._config)
       return;
-    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), s = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), n = this._stateText(t.chargerStatus), c = this._isCarConnected(n), g = this._number(t.gridImport), p = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), m = p ? s ? "active" : "idle" : "danger", u = this._config.show_controls !== !1;
+    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), l = this._stateText(t.chargerStatus), d = this._isCarConnected(l), s = this._number(t.gridImport), c = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = c ? a ? "active" : "idle" : "danger", g = this._config.show_controls !== !1;
     this.shadowRoot.innerHTML = `
-      <style>${_}</style>
-      <article class="card ${m}">
+      <style>${w}</style>
+      <article class="card ${p}">
         <header class="header">
           <div>
-            <h2>${a(this._config.title || "Solar Charge")}</h2>
-            <p>${a(e)}</p>
+            <h2>${n(this._config.title || "Solar Charge")}</h2>
+            <p>${n(e)}</p>
           </div>
-          <div class="status-pill ${m}">
+          <div class="status-pill ${p}">
             <span></span>
-            ${s ? "Allowed" : p ? "Waiting" : "Check"}
+            ${a ? "Allowed" : c ? "Waiting" : "Check"}
           </div>
         </header>
+
+        <section class="power-flow">
+          ${this._renderPowerFlow(t)}
+        </section>
 
         <section class="mode-row">
           <div>
             <span class="label">Mode</span>
-            <strong>${a(i)}</strong>
+            <strong>${n(i)}</strong>
           </div>
           <div>
             <span class="label">Control</span>
@@ -111,12 +115,12 @@ class b extends HTMLElement {
           </div>
           <div>
             <span class="label">Car</span>
-            <strong>${c ? "Connected" : "Disconnected"}</strong>
+            <strong>${d ? "Connected" : "Disconnected"}</strong>
           </div>
         </section>
 
         <section class="primary">
-          ${this._metric("Grid", this._formatPower(t.gridImport), g < 0 ? "exporting" : "importing")}
+          ${this._metric("Grid", this._formatPower(t.gridImport), s < 0 ? "exporting" : "importing")}
           ${this._metric("EV charging", this._formatPower(t.chargerPower), "live charger load")}
           ${this._metric("Target", this._formatCurrent(t.targetAmps), "calculated limit")}
         </section>
@@ -134,7 +138,7 @@ class b extends HTMLElement {
 
         <section class="reason">
           <span class="label">Reason</span>
-          <p>${a(r)}</p>
+          <p>${n(r)}</p>
         </section>
 
         <section class="safety">
@@ -144,17 +148,17 @@ class b extends HTMLElement {
           ${this._safetyItem("Free window", this._isOn(t.inFreeWindow))}
         </section>
 
-        ${u ? `<section class="controls">
+        ${g ? `<section class="controls">
                 <div class="mode-buttons">
-                  ${f.map(
-      (d) => `
+                  ${u.map(
+      (h) => `
                       <button
-                        class="${i === d.option ? "selected" : ""}"
+                        class="${i === h.option ? "selected" : ""}"
                         data-action="mode"
-                        data-option="${d.option}"
+                        data-option="${h.option}"
                         type="button"
                       >
-                        ${d.label}
+                        ${h.label}
                       </button>
                     `
     ).join("")}
@@ -170,18 +174,105 @@ class b extends HTMLElement {
       </article>
     `;
   }
+  _renderPowerFlow(t) {
+    const e = this._number(t.pvPower), r = this._number(t.gridImport), a = this._number(t.chargerPower), o = this._number(t.loadPower), i = this._number(t.batterySoc), l = e > 50, d = Math.abs(r) > 50, s = r < -50, c = a > 50, p = o > 50;
+    return `
+      <div class="flow-diagram">
+        <!-- Solar -->
+        <div class="flow-node solar ${l ? "active" : ""}">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M11.45 2v3.55L15 3l-1 4 3.6-1.6-2.2 3.6L20 7l-3.4 3L20 13h-3.4l2.2 3.6L15 15l1 4-3.55-2.5V20h-1v-3.55L8 19l1-4-3.6 1.6 2.2-3.6L4 15l3.4-3L4 9h3.4L5.2 5.4 9 7 8 3l3.45 2.55V2h1z" fill="currentColor"/></svg>
+          </div>
+          <div class="flow-value">${this._formatPower(t.pvPower)}</div>
+          <div class="flow-label">Production</div>
+        </div>
+
+        <!-- Grid -->
+        <div class="flow-node grid ${d ? s ? "exporting" : "importing" : ""}">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M14,2L20,8V10H14V16H20V18L14,24V22H10V18H4V16L2,14L4,12V6H10V2H14M12,4H10V12H4V14H10V20H12V14H18V12H12V4Z" fill="currentColor"/></svg>
+          </div>
+          <div class="flow-value">${this._formatPower(t.gridImport)}</div>
+          <div class="flow-label">${s ? "Export" : "Grid"}</div>
+        </div>
+
+        <!-- Center Home -->
+        <div class="flow-node home">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <!-- Battery/Charger -->
+        <div class="flow-node battery ${c ? "active" : ""}">
+          <div class="flow-icon">
+            ${this._batteryIcon(i)}
+          </div>
+          <div class="flow-value">${this._formatPower(t.chargerPower)}</div>
+          <div class="flow-label">EV Charger</div>
+        </div>
+
+        <!-- Load -->
+        <div class="flow-node load ${p ? "active" : ""}">
+          <div class="flow-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z" fill="currentColor"/></svg>
+          </div>
+          <div class="flow-value">${this._formatPower(t.loadPower)}</div>
+          <div class="flow-label">Load</div>
+        </div>
+
+        <!-- Flow lines -->
+        <svg class="flow-lines" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+          <!-- Solar to Home -->
+          <line x1="100" y1="75" x2="200" y2="150" class="flow-line ${l ? "active" : ""}" stroke-dasharray="4 4">
+            ${l ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+          
+          <!-- Grid to Home -->
+          <line x1="300" y1="75" x2="200" y2="150" class="flow-line ${d && !s ? "active" : ""}" stroke-dasharray="4 4">
+            ${d && !s ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+          
+          <!-- Home to Grid (export) -->
+          <line x1="200" y1="150" x2="300" y2="75" class="flow-line ${s ? "active export" : ""}" stroke-dasharray="4 4">
+            ${s ? '<animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+          
+          <!-- Home to Battery/Charger -->
+          <line x1="200" y1="150" x2="100" y2="225" class="flow-line ${c ? "active" : ""}" stroke-dasharray="4 4">
+            ${c ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+          
+          <!-- Home to Load -->
+          <line x1="200" y1="150" x2="300" y2="225" class="flow-line ${p ? "active" : ""}" stroke-dasharray="4 4">
+            ${p ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+        </svg>
+      </div>
+    `;
+  }
+  _batteryIcon(t) {
+    const e = Math.round(t / 25) * 25;
+    return `
+      <svg viewBox="0 0 24 24">
+        <path d="M16 18H8V6h8M16.67 4H15V2H9v2H7.33A1.33 1.33 0 0 0 6 5.33v15.33A1.34 1.34 0 0 0 7.33 22h9.34A1.34 1.34 0 0 0 18 20.67V5.33A1.33 1.33 0 0 0 16.67 4z" fill="currentColor" opacity="0.3"/>
+        <path d="M8 ${6 + (100 - e) * 0.12}h8v${e * 0.12}" fill="currentColor"/>
+        <text x="12" y="13" text-anchor="middle" font-size="6" fill="currentColor" font-weight="bold">${Math.round(t)}%</text>
+      </svg>
+    `;
+  }
   _entities() {
-    var s, o;
-    const t = ((s = this._config) == null ? void 0 : s.entities) || {}, e = this._baseObjectId(), r = {};
-    for (const i of Object.keys(h)) {
-      const [n, c] = h[i];
-      r[i] = t[i] || (e ? `${n}.${e}_${c}` : void 0);
+    var a, o;
+    const t = ((a = this._config) == null ? void 0 : a.entities) || {}, e = this._baseObjectId(), r = {};
+    for (const i of Object.keys(m)) {
+      const [l, d] = m[i];
+      r[i] = t[i] || (e ? `${l}.${e}_${d}` : void 0);
     }
     return (o = this._config) != null && o.entity && (r.status = t.status || this._config.entity), r;
   }
   _baseObjectId() {
-    var r, s, o;
-    const t = ((s = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : s.status) || ((o = this._config) == null ? void 0 : o.entity);
+    var r, a, o;
+    const t = ((a = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : a.status) || ((o = this._config) == null ? void 0 : o.entity);
     if (!t)
       return;
     const e = t.split(".")[1];
@@ -191,9 +282,9 @@ class b extends HTMLElement {
   _metric(t, e, r) {
     return `
       <div class="metric">
-        <span class="label">${a(t)}</span>
-        <strong>${a(e)}</strong>
-        <small>${a(r)}</small>
+        <span class="label">${n(t)}</span>
+        <strong>${n(e)}</strong>
+        <small>${n(r)}</small>
       </div>
     `;
   }
@@ -201,7 +292,7 @@ class b extends HTMLElement {
     return `
       <div class="safety-item ${e ? "ok" : "bad"}">
         <span></span>
-        ${a(t)}
+        ${n(t)}
       </div>
     `;
   }
@@ -250,7 +341,7 @@ class b extends HTMLElement {
     ])).has(e));
   }
 }
-const _ = `
+const w = `
   :host {
     display: block;
     color: var(--primary-text-color, #1f2933);
@@ -279,8 +370,137 @@ const _ = `
     background: #c24135;
   }
 
+  .power-flow {
+    padding-top: 20px;
+    padding-bottom: 20px;
+    background: linear-gradient(to bottom, rgba(240, 243, 246, 0.4), transparent);
+  }
+
+  .flow-diagram {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .flow-node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+  }
+
+  .flow-node.solar {
+    top: 0;
+    left: 10%;
+  }
+
+  .flow-node.grid {
+    top: 0;
+    right: 10%;
+  }
+
+  .flow-node.home {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .flow-node.battery {
+    bottom: 0;
+    left: 10%;
+  }
+
+  .flow-node.load {
+    bottom: 0;
+    right: 10%;
+  }
+
+  .flow-icon {
+    width: 56px;
+    height: 56px;
+    padding: 12px;
+    border-radius: 50%;
+    background: var(--card-background-color, #fff);
+    border: 2px solid var(--divider-color, rgba(127, 127, 127, 0.22));
+    color: var(--secondary-text-color, #667085);
+    transition: all 0.3s ease;
+  }
+
+  .flow-node.home .flow-icon {
+    width: 64px;
+    height: 64px;
+    border-width: 3px;
+    border-color: var(--primary-color, #1d6f9f);
+    color: var(--primary-color, #1d6f9f);
+  }
+
+  .flow-node.active .flow-icon {
+    border-color: #14866d;
+    color: #14866d;
+    background: rgba(20, 134, 109, 0.08);
+    box-shadow: 0 0 0 4px rgba(20, 134, 109, 0.12);
+  }
+
+  .flow-node.exporting .flow-icon {
+    border-color: #2563eb;
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.08);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  .flow-icon svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .flow-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--primary-text-color, #1f2933);
+    white-space: nowrap;
+  }
+
+  .flow-label {
+    font-size: 0.75rem;
+    color: var(--secondary-text-color, #667085);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    font-weight: 600;
+  }
+
+  .flow-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .flow-line {
+    stroke: var(--divider-color, rgba(127, 127, 127, 0.3));
+    stroke-width: 2;
+    fill: none;
+    transition: stroke 0.3s ease;
+  }
+
+  .flow-line.active {
+    stroke: #14866d;
+    stroke-width: 3;
+  }
+
+  .flow-line.export {
+    stroke: #2563eb;
+  }
+
   .header,
   .mode-row,
+  .power-flow,
   .primary,
   .metrics,
   .reason,
@@ -519,6 +739,25 @@ const _ = `
       width: fit-content;
     }
 
+    .flow-icon {
+      width: 48px;
+      height: 48px;
+      padding: 10px;
+    }
+
+    .flow-node.home .flow-icon {
+      width: 56px;
+      height: 56px;
+    }
+
+    .flow-value {
+      font-size: 0.85rem;
+    }
+
+    .flow-label {
+      font-size: 0.68rem;
+    }
+
     .primary,
     .metrics {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -537,8 +776,8 @@ const _ = `
     }
   }
 `;
-function a(l) {
-  return l.replace(/[&<>"']/g, (t) => {
+function n(f) {
+  return f.replace(/[&<>"']/g, (t) => {
     switch (t) {
       case "&":
         return "&amp;";
