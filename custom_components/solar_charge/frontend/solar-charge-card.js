@@ -4,7 +4,7 @@ const u = [
   { label: "Free", option: "Free hours only" },
   { label: "Hybrid", option: "Free hours or solar" },
   { label: "Force", option: "Force charge" }
-], m = {
+], g = {
   status: ["sensor", "status"],
   reason: ["sensor", "reason"],
   gridImport: ["sensor", "grid_import"],
@@ -85,7 +85,7 @@ class b extends HTMLElement {
   _render() {
     if (!this.shadowRoot || !this._config)
       return;
-    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), l = this._stateText(t.chargerStatus), d = this._isCarConnected(l), s = this._number(t.gridImport), c = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = c ? a ? "active" : "idle" : "danger", g = this._config.show_controls !== !1;
+    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), l = this._stateText(t.chargerStatus), d = this._isCarConnected(l), s = this._number(t.gridImport), c = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = c ? a ? "active" : "idle" : "danger", m = this._config.show_controls !== !1;
     this.shadowRoot.innerHTML = `
       <style>${w}</style>
       <article class="card ${p}">
@@ -148,7 +148,7 @@ class b extends HTMLElement {
           ${this._safetyItem("Free window", this._isOn(t.inFreeWindow))}
         </section>
 
-        ${g ? `<section class="controls">
+        ${m ? `<section class="controls">
                 <div class="mode-buttons">
                   ${u.map(
       (h) => `
@@ -181,7 +181,9 @@ class b extends HTMLElement {
         <!-- Solar -->
         <div class="flow-node solar ${l ? "active" : ""}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24"><path d="M11.45 2v3.55L15 3l-1 4 3.6-1.6-2.2 3.6L20 7l-3.4 3L20 13h-3.4l2.2 3.6L15 15l1 4-3.55-2.5V20h-1v-3.55L8 19l1-4-3.6 1.6 2.2-3.6L4 15l3.4-3L4 9h3.4L5.2 5.4 9 7 8 3l3.45 2.55V2h1z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M3.36,17L5.12,13.23C5.26,14 5.53,14.78 5.95,15.5C6.37,16.24 6.91,16.86 7.5,17.37L3.36,17M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M20.64,17L16.5,17.36C17.09,16.85 17.62,16.22 18.04,15.5C18.46,14.77 18.73,14 18.87,13.21L20.64,17M12,22L9.59,18.56C10.33,18.83 11.14,19 12,19C12.82,19 13.63,18.83 14.37,18.56L12,22Z" fill="currentColor"/>
+            </svg>
           </div>
           <div class="flow-value">${this._formatPower(t.pvPower)}</div>
           <div class="flow-label">Production</div>
@@ -190,7 +192,9 @@ class b extends HTMLElement {
         <!-- Grid -->
         <div class="flow-node grid ${d ? s ? "exporting" : "importing" : ""}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24"><path d="M14,2L20,8V10H14V16H20V18L14,24V22H10V18H4V16L2,14L4,12V6H10V2H14M12,4H10V12H4V14H10V20H12V14H18V12H12V4Z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M8,2V4.43C5.17,5.92 3.2,8.77 3.03,12.07L1,12A1,1 0 0,0 1,14H3.03C3.42,18.73 7.39,22.5 12.16,22.5C17.21,22.5 21.29,18.42 21.29,13.37C21.29,10.4 19.82,7.77 17.57,6.11L19.04,4.63C19.43,4.24 19.43,3.62 19.04,3.23L18.08,2.27C17.69,1.88 17.07,1.88 16.68,2.27L15.25,3.7C14.33,3.26 13.27,3 12.16,3C10.26,3 8.5,3.68 7.12,4.81L8,2M12.16,5C16.1,5 19.29,8.19 19.29,12.12C19.29,16.06 16.1,19.25 12.16,19.25C8.23,19.25 5.04,16.06 5.04,12.12C5.04,10 5.95,8.08 7.43,6.76L11.29,10.62C11.1,11 11,11.46 11,12A2,2 0 0,0 13,14A2,2 0 0,0 15,12A2,2 0 0,0 13,10C12.46,10 12,10.1 11.62,10.29L7.76,6.43C8.94,5.58 10.5,5 12.16,5Z" fill="currentColor"/>
+            </svg>
           </div>
           <div class="flow-value">${this._formatPower(t.gridImport)}</div>
           <div class="flow-label">${s ? "Export" : "Grid"}</div>
@@ -199,14 +203,16 @@ class b extends HTMLElement {
         <!-- Center Home -->
         <div class="flow-node home">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" fill="currentColor"/>
+            </svg>
           </div>
         </div>
 
         <!-- Battery/Charger -->
         <div class="flow-node battery ${c ? "active" : ""}">
           <div class="flow-icon">
-            ${this._batteryIcon(i)}
+            ${this._evChargerIcon(c, i)}
           </div>
           <div class="flow-value">${this._formatPower(t.chargerPower)}</div>
           <div class="flow-label">EV Charger</div>
@@ -215,7 +221,9 @@ class b extends HTMLElement {
         <!-- Load -->
         <div class="flow-node load ${p ? "active" : ""}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M9.3,10.8L8,11.3L6,9L4,11.3L2.7,10.8L5,7.8L9.3,10.8M14,10.8L15.3,11.3L17.3,9L19.3,11.3L20.6,10.8L16.3,7.8L14,10.8M12,14C9.8,14 8,15.8 8,18C8,20.2 9.8,22 12,22A4,4 0 0,0 16,18C16,15.8 14.2,14 12,14M12,20C10.9,20 10,19.1 10,18C10,16.9 10.9,16 12,16C13.1,16 14,16.9 14,18C14,19.1 13.1,20 12,20M9,2V4H11V8A1,1 0 0,1 10,9H8A1,1 0 0,1 7,8V4H9V2M15,2V4H17V8A1,1 0 0,1 16,9H14A1,1 0 0,1 13,8V4H15V2Z" fill="currentColor"/>
+            </svg>
           </div>
           <div class="flow-value">${this._formatPower(t.loadPower)}</div>
           <div class="flow-label">Load</div>
@@ -251,21 +259,39 @@ class b extends HTMLElement {
       </div>
     `;
   }
-  _batteryIcon(t) {
-    const e = Math.round(t / 25) * 25;
+  _evChargerIcon(t, e) {
+    const r = e > 0 ? `${Math.round(e)}%` : "";
     return `
       <svg viewBox="0 0 24 24">
-        <path d="M16 18H8V6h8M16.67 4H15V2H9v2H7.33A1.33 1.33 0 0 0 6 5.33v15.33A1.34 1.34 0 0 0 7.33 22h9.34A1.34 1.34 0 0 0 18 20.67V5.33A1.33 1.33 0 0 0 16.67 4z" fill="currentColor" opacity="0.3"/>
-        <path d="M8 ${6 + (100 - e) * 0.12}h8v${e * 0.12}" fill="currentColor"/>
-        <text x="12" y="13" text-anchor="middle" font-size="6" fill="currentColor" font-weight="bold">${Math.round(t)}%</text>
+        <g>
+          <!-- EV Charger body -->
+          <path d="M16.5,3H8.5A1.5,1.5 0 0,0 7,4.5V19.5A1.5,1.5 0 0,0 8.5,21H16.5A1.5,1.5 0 0,0 18,19.5V4.5A1.5,1.5 0 0,0 16.5,3Z" fill="currentColor" opacity="0.2"/>
+          <path d="M16.5,3H8.5A1.5,1.5 0 0,0 7,4.5V19.5A1.5,1.5 0 0,0 8.5,21H16.5A1.5,1.5 0 0,0 18,19.5V4.5A1.5,1.5 0 0,0 16.5,3M16,19H9V5H16V19Z" fill="currentColor"/>
+          
+          <!-- Charging plug cable -->
+          <path d="M18,7H20V8H22V16H20V17H18V7M20,9.5V10.5H21V9.5H20M20,11.5V12.5H21V11.5H20M20,13.5V14.5H21V13.5H20Z" fill="currentColor"/>
+          
+          ${t ? `
+            <!-- Lightning bolt when charging -->
+            <path d="M14,8L11,13H13L11,18L16,11H14L14,8Z" fill="currentColor"/>
+          ` : r ? `
+            <!-- Battery level indicator -->
+            <rect x="10" y="7" width="5" height="10" fill="currentColor" opacity="0.15"/>
+            ${e > 80 ? '<rect x="10" y="7" width="5" height="2" fill="currentColor"/>' : ""}
+            ${e > 60 ? '<rect x="10" y="9.5" width="5" height="2" fill="currentColor"/>' : ""}
+            ${e > 40 ? '<rect x="10" y="12" width="5" height="2" fill="currentColor"/>' : ""}
+            ${e > 20 ? '<rect x="10" y="14.5" width="5" height="2" fill="currentColor"/>' : ""}
+          ` : ""}
+        </g>
+        ${r ? `<text x="12.5" y="22" text-anchor="middle" font-size="4" fill="currentColor" font-weight="bold">${r}</text>` : ""}
       </svg>
     `;
   }
   _entities() {
     var a, o;
     const t = ((a = this._config) == null ? void 0 : a.entities) || {}, e = this._baseObjectId(), r = {};
-    for (const i of Object.keys(m)) {
-      const [l, d] = m[i];
+    for (const i of Object.keys(g)) {
+      const [l, d] = g[i];
       r[i] = t[i] || (e ? `${l}.${e}_${d}` : void 0);
     }
     return (o = this._config) != null && o.entity && (r.status = t.status || this._config.entity), r;
