@@ -102,10 +102,23 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         value_fn=lambda data: data.get("pv_power_w"),
     ),
     SolarChargeSensorDescription(
+        key="load_power",
+        translation_key="load_power",
+        native_unit_of_measurement=UnitOfPower.WATT,
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("load_power_w"),
+    ),
+    SolarChargeSensorDescription(
         key="battery_soc",
         translation_key="battery_soc",
         native_unit_of_measurement="%",
         value_fn=lambda data: data.get("battery_soc_pct"),
+    ),
+    SolarChargeSensorDescription(
+        key="charger_status",
+        translation_key="charger_status",
+        value_fn=lambda data: data.get("charger_status"),
     ),
     SolarChargeSensorDescription(
         key="reason",

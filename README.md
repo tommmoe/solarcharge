@@ -14,6 +14,7 @@ It calculates an EV charger current limit from live grid import/export, charger 
 - Provides a control-enabled switch, default off.
 - Writes to charger entities only when control is explicitly enabled.
 - Fails safe when required sensors are unavailable, unknown, or stale.
+- Checks charger status and only enables charging when a vehicle is connected, preventing unnecessary charger activations.
 
 ## What It Does Not Do
 
@@ -61,6 +62,7 @@ Deye/Sunsynk:
 
 - Grid: `sensor.deye_grid_ct_power_corrected`
 - PV: `sensor.deye_pv1_power`, `sensor.deye_pv2_power`, `sensor.deye_pv3_power`
+  - **Note**: For AC-coupled solar systems (where panels connect to a separate solar inverter, not the Deye DC inputs), these PV sensors will always be 0W. See [AC-Coupled Setup Guide](docs/AC_COUPLED_SETUP.md) for configuration.
 - Battery power: `sensor.deye_battery_power`
 - Battery SOC: `sensor.deye_battery_soc`
 - Load: `sensor.deye_load_power`
@@ -138,7 +140,14 @@ title: Garage EV Charging
 show_controls: true
 ```
 
-The card derives related entity IDs from the status sensor. For example, `sensor.solar_charge_status` maps to `sensor.solar_charge_target_amps`, `binary_sensor.solar_charge_allowed_to_charge`, `select.solar_charge_mode`, and `switch.solar_charge_control_enabled`.
+The card derives related entity IDs from the status sensor. For example, `sensor.solar_charge_status` maps to `sensor.solar_charge_target_amps`, `sensor.solar_charge_charger_status`, `binary_sensor.solar_charge_allowed_to_charge`, `select.solar_charge_mode`, and `switch.solar_charge_control_enabled`.
+
+The card displays:
+- Current charging status and mode
+- Car connection status (detected from charger status sensor)
+- Real-time power and current metrics
+- Grid, charger, and breaker safety indicators
+- Interactive mode controls (when `show_controls: true`)
 
 If Home Assistant assigns different entity IDs, override only the ones that differ:
 
@@ -150,6 +159,14 @@ entities:
   mode: select.garage_ev_mode
   controlEnabled: switch.garage_ev_control_enabled
 ```
+
+## Documentation
+
+- [AC-Coupled Solar Setup Guide](docs/AC_COUPLED_SETUP.md) - Configure Solar Charge with AC-coupled solar systems
+- [Dashboard Cards Configuration](docs/DASHBOARD_CARDS.md) - Lovelace card examples and customization
+- [Energy Optimization Strategies](docs/ENERGY_OPTIMIZATION.md) - Optimize your solar and battery usage
+- [InfluxDB Setup Guide](docs/INFLUXDB_SETUP.md) - Set up long-term data collection and analysis
+- [Monitoring Setup Guide](docs/MONITORING_SETUP.md) - Monitor and analyze your energy patterns
 
 ## Development
 

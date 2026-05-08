@@ -92,7 +92,9 @@
       "actual_current": { "name": "Actual current" },
       "offered_current": { "name": "Offered current" },
       "pv_power": { "name": "PV power" },
+      "load_power": { "name": "Load power" },
       "battery_soc": { "name": "Battery SOC" },
+      "charger_status": { "name": "Charger status" },
       "reason": { "name": "Reason" },
       "status": { "name": "Status" }
     },

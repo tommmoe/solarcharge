@@ -26,9 +26,14 @@ from .const import (
     SERVICE_SET_MODE,
     SERVICE_STOP_CHARGING,
 )
-from .coordinator import SolarChargeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# CRITICAL: Import config_flow at module level to ensure ConfigFlow handler
+# registers with HANDLERS BEFORE any config entry migration runs.
+from . import config_flow as _  # noqa: F401
+
+from .coordinator import SolarChargeCoordinator
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:

@@ -61,6 +61,7 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Solar Charge."""
 
     VERSION = 1
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
@@ -71,12 +72,6 @@ class SolarChargeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> OptionsFlowHandler:
         """Create the options flow."""
-
-        _LOGGER.info(
-            "Solar Charge: async_get_options_flow entry_id=%s title=%s",
-            config_entry.entry_id,
-            config_entry.title,
-        )
         return OptionsFlowHandler()
 
     async def async_step_user(

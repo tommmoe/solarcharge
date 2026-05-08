@@ -1,10 +1,10 @@
-const g = [
+const f = [
   { label: "Off", option: "Off" },
   { label: "Solar", option: "Solar only" },
   { label: "Free", option: "Free hours only" },
   { label: "Hybrid", option: "Free hours or solar" },
   { label: "Force", option: "Force charge" }
-], m = {
+], h = {
   status: ["sensor", "status"],
   reason: ["sensor", "reason"],
   gridImport: ["sensor", "grid_import"],
@@ -16,7 +16,9 @@ const g = [
   actualCurrent: ["sensor", "actual_current"],
   offeredCurrent: ["sensor", "offered_current"],
   pvPower: ["sensor", "pv_power"],
+  loadPower: ["sensor", "load_power"],
   batterySoc: ["sensor", "battery_soc"],
+  chargerStatus: ["sensor", "charger_status"],
   allowedToCharge: ["binary_sensor", "allowed_to_charge"],
   inFreeWindow: ["binary_sensor", "in_free_window"],
   gridSensorOk: ["binary_sensor", "grid_sensor_ok"],
@@ -25,7 +27,7 @@ const g = [
   mode: ["select", "mode"],
   controlEnabled: ["switch", "control_enabled"]
 };
-class u extends HTMLElement {
+class b extends HTMLElement {
   constructor() {
     var t;
     super(), this.attachShadow({ mode: "open" }), (t = this.shadowRoot) == null || t.addEventListener("click", (e) => {
@@ -62,8 +64,8 @@ class u extends HTMLElement {
     );
     if (!e || !this._hass)
       return;
-    const r = this._entities(), a = e.dataset.action;
-    if (a === "mode") {
+    const r = this._entities(), s = e.dataset.action;
+    if (s === "mode") {
       const o = e.dataset.option;
       if (!o || !r.mode)
         return;
@@ -73,7 +75,7 @@ class u extends HTMLElement {
       });
       return;
     }
-    if (a === "toggle-control" && r.controlEnabled) {
+    if (s === "toggle-control" && r.controlEnabled) {
       const o = this._isOn(r.controlEnabled);
       await this._hass.callService("switch", o ? "turn_off" : "turn_on", {
         entity_id: r.controlEnabled
@@ -83,34 +85,38 @@ class u extends HTMLElement {
   _render() {
     if (!this.shadowRoot || !this._config)
       return;
-    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), c = this._number(t.gridImport), n = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = n ? a ? "active" : "idle" : "danger", h = this._config.show_controls !== !1;
+    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), s = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), n = this._stateText(t.chargerStatus), c = this._isCarConnected(n), g = this._number(t.gridImport), p = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), m = p ? s ? "active" : "idle" : "danger", u = this._config.show_controls !== !1;
     this.shadowRoot.innerHTML = `
-      <style>${f}</style>
-      <article class="card ${p}">
+      <style>${_}</style>
+      <article class="card ${m}">
         <header class="header">
           <div>
-            <h2>${s(this._config.title || "Solar Charge")}</h2>
-            <p>${s(e)}</p>
+            <h2>${a(this._config.title || "Solar Charge")}</h2>
+            <p>${a(e)}</p>
           </div>
-          <div class="status-pill ${p}">
+          <div class="status-pill ${m}">
             <span></span>
-            ${a ? "Allowed" : n ? "Waiting" : "Check"}
+            ${s ? "Allowed" : p ? "Waiting" : "Check"}
           </div>
         </header>
 
         <section class="mode-row">
           <div>
             <span class="label">Mode</span>
-            <strong>${s(i)}</strong>
+            <strong>${a(i)}</strong>
           </div>
           <div>
             <span class="label">Control</span>
             <strong>${o ? "Enabled" : "Off"}</strong>
           </div>
+          <div>
+            <span class="label">Car</span>
+            <strong>${c ? "Connected" : "Disconnected"}</strong>
+          </div>
         </section>
 
         <section class="primary">
-          ${this._metric("Grid", this._formatPower(t.gridImport), c < 0 ? "exporting" : "importing")}
+          ${this._metric("Grid", this._formatPower(t.gridImport), g < 0 ? "exporting" : "importing")}
           ${this._metric("EV charging", this._formatPower(t.chargerPower), "live charger load")}
           ${this._metric("Target", this._formatCurrent(t.targetAmps), "calculated limit")}
         </section>
@@ -122,12 +128,13 @@ class u extends HTMLElement {
           ${this._metric("Actual", this._formatCurrent(t.actualCurrent), "charger current")}
           ${this._metric("Offered", this._formatCurrent(t.offeredCurrent), "OCPP limit")}
           ${this._metric("Solar", this._formatPower(t.pvPower), "PV power")}
+          ${this._metric("Load", this._formatPower(t.loadPower), "house consumption")}
           ${this._metric("Battery", this._formatPercent(t.batterySoc), "state of charge")}
         </section>
 
         <section class="reason">
           <span class="label">Reason</span>
-          <p>${s(r)}</p>
+          <p>${a(r)}</p>
         </section>
 
         <section class="safety">
@@ -137,9 +144,9 @@ class u extends HTMLElement {
           ${this._safetyItem("Free window", this._isOn(t.inFreeWindow))}
         </section>
 
-        ${h ? `<section class="controls">
+        ${u ? `<section class="controls">
                 <div class="mode-buttons">
-                  ${g.map(
+                  ${f.map(
       (d) => `
                       <button
                         class="${i === d.option ? "selected" : ""}"
@@ -164,17 +171,17 @@ class u extends HTMLElement {
     `;
   }
   _entities() {
-    var a, o;
-    const t = ((a = this._config) == null ? void 0 : a.entities) || {}, e = this._baseObjectId(), r = {};
-    for (const i of Object.keys(m)) {
-      const [c, n] = m[i];
-      r[i] = t[i] || (e ? `${c}.${e}_${n}` : void 0);
+    var s, o;
+    const t = ((s = this._config) == null ? void 0 : s.entities) || {}, e = this._baseObjectId(), r = {};
+    for (const i of Object.keys(h)) {
+      const [n, c] = h[i];
+      r[i] = t[i] || (e ? `${n}.${e}_${c}` : void 0);
     }
     return (o = this._config) != null && o.entity && (r.status = t.status || this._config.entity), r;
   }
   _baseObjectId() {
-    var r, a, o;
-    const t = ((a = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : a.status) || ((o = this._config) == null ? void 0 : o.entity);
+    var r, s, o;
+    const t = ((s = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : s.status) || ((o = this._config) == null ? void 0 : o.entity);
     if (!t)
       return;
     const e = t.split(".")[1];
@@ -184,9 +191,9 @@ class u extends HTMLElement {
   _metric(t, e, r) {
     return `
       <div class="metric">
-        <span class="label">${s(t)}</span>
-        <strong>${s(e)}</strong>
-        <small>${s(r)}</small>
+        <span class="label">${a(t)}</span>
+        <strong>${a(e)}</strong>
+        <small>${a(r)}</small>
       </div>
     `;
   }
@@ -194,7 +201,7 @@ class u extends HTMLElement {
     return `
       <div class="safety-item ${e ? "ok" : "bad"}">
         <span></span>
-        ${s(t)}
+        ${a(t)}
       </div>
     `;
   }
@@ -230,8 +237,20 @@ class u extends HTMLElement {
     const e = this._state(t), r = Number(e == null ? void 0 : e.state);
     return !e || !Number.isFinite(r) ? "-" : `${Math.round(r)}%`;
   }
+  _isCarConnected(t) {
+    if (!t || t === "-")
+      return !1;
+    const e = t.toLowerCase();
+    return !(e === "available" || (/* @__PURE__ */ new Set([
+      "unavailable",
+      "disconnected",
+      "not connected",
+      "idle",
+      "ready"
+    ])).has(e));
+  }
 }
-const f = `
+const _ = `
   :host {
     display: block;
     color: var(--primary-text-color, #1f2933);
@@ -336,7 +355,7 @@ const f = `
 
   .mode-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.18));
     border-bottom: 1px solid var(--divider-color, rgba(127, 127, 127, 0.18));
   }
@@ -518,7 +537,7 @@ const f = `
     }
   }
 `;
-function s(l) {
+function a(l) {
   return l.replace(/[&<>"']/g, (t) => {
     switch (t) {
       case "&":
@@ -534,7 +553,7 @@ function s(l) {
     }
   });
 }
-customElements.get("solar-charge-card") || customElements.define("solar-charge-card", u);
+customElements.get("solar-charge-card") || customElements.define("solar-charge-card", b);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "solar-charge-card",

@@ -25,7 +25,9 @@ type EntityKey =
   | "actualCurrent"
   | "offeredCurrent"
   | "pvPower"
+  | "loadPower"
   | "batterySoc"
+  | "chargerStatus"
   | "allowedToCharge"
   | "inFreeWindow"
   | "gridSensorOk"
@@ -62,7 +64,9 @@ const ENTITY_SUFFIXES: Record<EntityKey, [string, string]> = {
   actualCurrent: ["sensor", "actual_current"],
   offeredCurrent: ["sensor", "offered_current"],
   pvPower: ["sensor", "pv_power"],
+  loadPower: ["sensor", "load_power"],
   batterySoc: ["sensor", "battery_soc"],
+  chargerStatus: ["sensor", "charger_status"],
   allowedToCharge: ["binary_sensor", "allowed_to_charge"],
   inFreeWindow: ["binary_sensor", "in_free_window"],
   gridSensorOk: ["binary_sensor", "grid_sensor_ok"],
@@ -159,6 +163,8 @@ class SolarChargeCard extends HTMLElement {
     const allowed = this._isOn(entities.allowedToCharge);
     const controlEnabled = this._isOn(entities.controlEnabled);
     const mode = this._stateText(entities.mode);
+    const chargerStatus = this._stateText(entities.chargerStatus);
+    const carConnected = this._isCarConnected(chargerStatus);
     const grid = this._number(entities.gridImport);
     const safetyOk =
       this._isOn(entities.gridSensorOk) &&
@@ -190,6 +196,10 @@ class SolarChargeCard extends HTMLElement {
             <span class="label">Control</span>
             <strong>${controlEnabled ? "Enabled" : "Off"}</strong>
           </div>
+          <div>
+            <span class="label">Car</span>
+            <strong>${carConnected ? "Connected" : "Disconnected"}</strong>
+          </div>
         </section>
 
         <section class="primary">
@@ -205,6 +215,7 @@ class SolarChargeCard extends HTMLElement {
           ${this._metric("Actual", this._formatCurrent(entities.actualCurrent), "charger current")}
           ${this._metric("Offered", this._formatCurrent(entities.offeredCurrent), "OCPP limit")}
           ${this._metric("Solar", this._formatPower(entities.pvPower), "PV power")}
+          ${this._metric("Load", this._formatPower(entities.loadPower), "house consumption")}
           ${this._metric("Battery", this._formatPercent(entities.batterySoc), "state of charge")}
         </section>
 
@@ -358,6 +369,35 @@ class SolarChargeCard extends HTMLElement {
     }
     return `${Math.round(value)}%`;
   }
+
+  private _isCarConnected(chargerStatus: string): boolean {
+    if (!chargerStatus || chargerStatus === "-") {
+      return false;
+    }
+
+    const statusLower = chargerStatus.toLowerCase();
+
+    // OCPP status indicating NO car connected
+    if (statusLower === "available") {
+      return false;
+    }
+
+    // Common status values indicating car is NOT connected
+    const disconnectedStates = new Set([
+      "unavailable",
+      "disconnected",
+      "not connected",
+      "idle",
+      "ready",
+    ]);
+    if (disconnectedStates.has(statusLower)) {
+      return false;
+    }
+
+    // All other statuses likely indicate a car is connected
+    // (Preparing, Charging, SuspendedEV, SuspendedEVSE, Finishing, etc.)
+    return true;
+  }
 }
 
 const CARD_CSS = `
@@ -465,7 +505,7 @@ const CARD_CSS = `
 
   .mode-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.18));
     border-bottom: 1px solid var(--divider-color, rgba(127, 127, 127, 0.18));
   }

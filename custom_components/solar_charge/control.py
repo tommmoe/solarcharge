@@ -76,6 +76,12 @@ class ChargeController:
             )
             return
 
+        # Check if car is connected before attempting to enable charging
+        charger_status = data.get("charger_status")
+        if charger_status and not self._is_car_connected(charger_status):
+            self._record(f"Car not connected (status: {charger_status})")
+            return
+
         if not await self._set_current_if_needed(decision, force):
             return
         await self._turn_charge_control_on()
@@ -220,6 +226,40 @@ class ChargeController:
         )
         elapsed = (dt_util.utcnow() - self._last_current_update).total_seconds()
         return elapsed >= interval
+
+    def _is_car_connected(self, charger_status: str) -> bool:
+        """Check if charger status indicates a car is connected.
+        
+        For OCPP chargers:
+        - "Available" = no car connected
+        - "Preparing", "Charging", "SuspendedEV", "SuspendedEVSE", "Finishing" = car connected
+        
+        Also handles common non-OCPP status values.
+        """
+        if not charger_status:
+            # If no status available, assume car might be connected to avoid beeping
+            return True
+        
+        status_lower = str(charger_status).lower()
+        
+        # OCPP status indicating NO car connected
+        if status_lower == "available":
+            return False
+        
+        # Common status values indicating car is NOT connected
+        disconnected_states = {
+            "unavailable",
+            "disconnected",
+            "not connected",
+            "idle",
+            "ready",
+        }
+        if status_lower in disconnected_states:
+            return False
+        
+        # All other statuses likely indicate a car is connected
+        # (Preparing, Charging, SuspendedEV, SuspendedEVSE, Finishing, etc.)
+        return True
 
     def _record(self, message: str, **extra: Any) -> None:
         self.last_action = {
