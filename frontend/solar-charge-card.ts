@@ -27,6 +27,7 @@ type EntityKey =
   | "pvPower"
   | "loadPower"
   | "batterySoc"
+  | "batteryPower"
   | "chargerStatus"
   | "allowedToCharge"
   | "inFreeWindow"
@@ -66,6 +67,7 @@ const ENTITY_SUFFIXES: Record<EntityKey, [string, string]> = {
   pvPower: ["sensor", "pv_power"],
   loadPower: ["sensor", "load_power"],
   batterySoc: ["sensor", "battery_soc"],
+  batteryPower: ["sensor", "battery_power"],
   chargerStatus: ["sensor", "charger_status"],
   allowedToCharge: ["binary_sensor", "allowed_to_charge"],
   inFreeWindow: ["binary_sensor", "in_free_window"],
@@ -269,7 +271,8 @@ class SolarChargeCard extends HTMLElement {
   private _renderPowerFlow(entities: Record<EntityKey, string | undefined>): string {
     const pvPower = this._number(entities.pvPower);
     const gridPower = this._number(entities.gridImport);
-    const batteryPower = this._number(entities.chargerPower);
+    const batteryPower = this._number(entities.batteryPower);
+    const chargerPower = this._number(entities.chargerPower);
     const loadPower = this._number(entities.loadPower);
     const batterySoc = this._number(entities.batterySoc);
 
@@ -278,6 +281,8 @@ class SolarChargeCard extends HTMLElement {
     const gridActive = Math.abs(gridPower) > 50;
     const gridExporting = gridPower < -50;
     const batteryCharging = batteryPower > 50;
+    const batteryDischarging = batteryPower < -50;
+    const chargerActive = chargerPower > 50;
     const loadActive = loadPower > 50;
 
     return `
@@ -285,8 +290,28 @@ class SolarChargeCard extends HTMLElement {
         <!-- Solar -->
         <div class="flow-node solar ${pvActive ? 'active' : ''}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M3.36,17L5.12,13.23C5.26,14 5.53,14.78 5.95,15.5C6.37,16.24 6.91,16.86 7.5,17.37L3.36,17M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M20.64,17L16.5,17.36C17.09,16.85 17.62,16.22 18.04,15.5C18.46,14.77 18.73,14 18.87,13.21L20.64,17M12,22L9.59,18.56C10.33,18.83 11.14,19 12,19C12.82,19 13.63,18.83 14.37,18.56L12,22Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Sun -->
+              <circle cx="12" cy="6" r="2.5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="18" y1="6" x2="16.5" y2="6"/>
+              <line x1="15.5" y1="3.5" x2="14.5" y2="4.5"/>
+              <line x1="15.5" y1="8.5" x2="14.5" y2="7.5"/>
+              <line x1="6" y1="6" x2="7.5" y2="6"/>
+              <line x1="8.5" y1="3.5" x2="9.5" y2="4.5"/>
+              <line x1="8.5" y1="8.5" x2="9.5" y2="7.5"/>
+              <!-- Solar panel stand -->
+              <path d="M12 11 L12 16"/>
+              <path d="M9 16 L15 16"/>
+              <path d="M10 16 L10 18"/>
+              <path d="M14 16 L14 18"/>
+              <path d="M8 18 L16 18"/>
+              <!-- Solar panel -->
+              <rect x="7" y="9.5" width="10" height="5" rx="0.5"/>
+              <line x1="9.5" y1="9.5" x2="9.5" y2="14.5"/>
+              <line x1="12" y1="9.5" x2="12" y2="14.5"/>
+              <line x1="14.5" y1="9.5" x2="14.5" y2="14.5"/>
+              <line x1="7" y1="12" x2="17" y2="12"/>
             </svg>
           </div>
           <div class="flow-value">${this._formatPower(entities.pvPower)}</div>
@@ -296,8 +321,30 @@ class SolarChargeCard extends HTMLElement {
         <!-- Grid -->
         <div class="flow-node grid ${gridActive ? (gridExporting ? 'exporting' : 'importing') : ''}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M8,2V4.43C5.17,5.92 3.2,8.77 3.03,12.07L1,12A1,1 0 0,0 1,14H3.03C3.42,18.73 7.39,22.5 12.16,22.5C17.21,22.5 21.29,18.42 21.29,13.37C21.29,10.4 19.82,7.77 17.57,6.11L19.04,4.63C19.43,4.24 19.43,3.62 19.04,3.23L18.08,2.27C17.69,1.88 17.07,1.88 16.68,2.27L15.25,3.7C14.33,3.26 13.27,3 12.16,3C10.26,3 8.5,3.68 7.12,4.81L8,2M12.16,5C16.1,5 19.29,8.19 19.29,12.12C19.29,16.06 16.1,19.25 12.16,19.25C8.23,19.25 5.04,16.06 5.04,12.12C5.04,10 5.95,8.08 7.43,6.76L11.29,10.62C11.1,11 11,11.46 11,12A2,2 0 0,0 13,14A2,2 0 0,0 15,12A2,2 0 0,0 13,10C12.46,10 12,10.1 11.62,10.29L7.76,6.43C8.94,5.58 10.5,5 12.16,5Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Transmission tower -->
+              <path d="M12 2 L12 22"/>
+              <!-- Top crossbar -->
+              <path d="M6 6 L18 6"/>
+              <path d="M6 6 L8 4"/>
+              <path d="M18 6 L16 4"/>
+              <!-- Power lines from top -->
+              <path d="M6 6 L4 7"/>
+              <path d="M18 6 L20 7"/>
+              <!-- Middle crossbar -->
+              <path d="M7 11 L17 11"/>
+              <path d="M7 11 L5 12"/>
+              <path d="M17 11 L19 12"/>
+              <!-- Lower crossbar -->
+              <path d="M8 16 L16 16"/>
+              <path d="M8 16 L6 17"/>
+              <path d="M16 16 L18 17"/>
+              <!-- Tower structure -->
+              <path d="M10 8 L12 6 L14 8"/>
+              <path d="M9.5 13 L12 11 L14.5 13"/>
+              <path d="M9 18 L12 16 L15 18"/>
+              <!-- Base -->
+              <path d="M8 22 L16 22"/>
             </svg>
           </div>
           <div class="flow-value">${this._formatPower(entities.gridImport)}</div>
@@ -307,16 +354,35 @@ class SolarChargeCard extends HTMLElement {
         <!-- Center Home -->
         <div class="flow-node home">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- House -->
+              <path d="M3 12 L12 3 L21 12"/>
+              <path d="M5 10 L5 20 C5 20.5 5.5 21 6 21 L18 21 C18.5 21 19 20.5 19 20 L19 10"/>
+              <!-- Chimney -->
+              <rect x="15" y="5" width="2" height="3"/>
+              <!-- Power plug -->
+              <circle cx="12" cy="14" r="3.5" fill="none" stroke-width="1.5"/>
+              <rect x="10.5" y="11" width="1" height="1.5" fill="currentColor" stroke="none"/>
+              <rect x="12.5" y="11" width="1" height="1.5" fill="currentColor" stroke="none"/>
+              <path d="M12 17.5 L12 19.5" stroke-width="1.5"/>
+              <path d="M10.5 19.5 L13.5 19.5" stroke-width="1.5"/>
             </svg>
           </div>
         </div>
 
-        <!-- Battery/Charger -->
-        <div class="flow-node battery ${batteryCharging ? 'active' : ''}">
+        <!-- Battery -->
+        <div class="flow-node battery ${batteryCharging ? 'active charging' : batteryDischarging ? 'active discharging' : ''}">
           <div class="flow-icon">
-            ${this._evChargerIcon(batteryCharging, batterySoc)}
+            ${this._batteryIcon(batterySoc, batteryCharging, batteryDischarging)}
+          </div>
+          <div class="flow-value">${this._formatPower(entities.batteryPower)}</div>
+          <div class="flow-label">Battery</div>
+        </div>
+
+        <!-- EV Charger -->
+        <div class="flow-node charger ${chargerActive ? 'active' : ''}">
+          <div class="flow-icon">
+            ${this._evChargerIcon(chargerActive)}
           </div>
           <div class="flow-value">${this._formatPower(entities.chargerPower)}</div>
           <div class="flow-label">EV Charger</div>
@@ -325,8 +391,15 @@ class SolarChargeCard extends HTMLElement {
         <!-- Load -->
         <div class="flow-node load ${loadActive ? 'active' : ''}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M9.3,10.8L8,11.3L6,9L4,11.3L2.7,10.8L5,7.8L9.3,10.8M14,10.8L15.3,11.3L17.3,9L19.3,11.3L20.6,10.8L16.3,7.8L14,10.8M12,14C9.8,14 8,15.8 8,18C8,20.2 9.8,22 12,22A4,4 0 0,0 16,18C16,15.8 14.2,14 12,14M12,20C10.9,20 10,19.1 10,18C10,16.9 10.9,16 12,16C13.1,16 14,16.9 14,18C14,19.1 13.1,20 12,20M9,2V4H11V8A1,1 0 0,1 10,9H8A1,1 0 0,1 7,8V4H9V2M15,2V4H17V8A1,1 0 0,1 16,9H14A1,1 0 0,1 13,8V4H15V2Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- House outline -->
+              <path d="M3 12 L12 3 L21 12 L21 20 C21 20.5 20.5 21 20 21 L4 21 C3.5 21 3 20.5 3 20 Z"/>
+              <!-- Power plug in center -->
+              <circle cx="12" cy="14" r="3" fill="none"/>
+              <rect x="10.8" y="11.5" width="0.8" height="1.2" fill="currentColor" stroke="none"/>
+              <rect x="12.4" y="11.5" width="0.8" height="1.2" fill="currentColor" stroke="none"/>
+              <line x1="12" y1="17" x2="12" y2="18.5"/>
+              <line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/>
             </svg>
           </div>
           <div class="flow-value">${this._formatPower(entities.loadPower)}</div>
@@ -336,27 +409,37 @@ class SolarChargeCard extends HTMLElement {
         <!-- Flow lines -->
         <svg class="flow-lines" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
           <!-- Solar to Home -->
-          <line x1="100" y1="75" x2="200" y2="150" class="flow-line ${pvActive ? 'active' : ''}" stroke-dasharray="4 4">
+          <line x1="80" y1="75" x2="200" y2="150" class="flow-line ${pvActive ? 'active' : ''}" stroke-dasharray="4 4">
             ${pvActive ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
           </line>
           
           <!-- Grid to Home -->
-          <line x1="300" y1="75" x2="200" y2="150" class="flow-line ${gridActive && !gridExporting ? 'active' : ''}" stroke-dasharray="4 4">
+          <line x1="320" y1="75" x2="200" y2="150" class="flow-line ${gridActive && !gridExporting ? 'active' : ''}" stroke-dasharray="4 4">
             ${gridActive && !gridExporting ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
           </line>
           
           <!-- Home to Grid (export) -->
-          <line x1="200" y1="150" x2="300" y2="75" class="flow-line ${gridExporting ? 'active export' : ''}" stroke-dasharray="4 4">
+          <line x1="200" y1="150" x2="320" y2="75" class="flow-line ${gridExporting ? 'active export' : ''}" stroke-dasharray="4 4">
             ${gridExporting ? '<animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>' : ''}
           </line>
           
-          <!-- Home to Battery/Charger -->
-          <line x1="200" y1="150" x2="100" y2="225" class="flow-line ${batteryCharging ? 'active' : ''}" stroke-dasharray="4 4">
+          <!-- Home to Battery (charging) -->
+          <line x1="200" y1="150" x2="80" y2="225" class="flow-line ${batteryCharging ? 'active' : ''}" stroke-dasharray="4 4">
             ${batteryCharging ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
           </line>
           
+          <!-- Battery to Home (discharging) -->
+          <line x1="80" y1="225" x2="200" y2="150" class="flow-line ${batteryDischarging ? 'active' : ''}" stroke-dasharray="4 4">
+            ${batteryDischarging ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+          
+          <!-- Home to Charger -->
+          <line x1="200" y1="150" x2="200" y2="225" class="flow-line ${chargerActive ? 'active' : ''}" stroke-dasharray="4 4">
+            ${chargerActive ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
+          </line>
+          
           <!-- Home to Load -->
-          <line x1="200" y1="150" x2="300" y2="225" class="flow-line ${loadActive ? 'active' : ''}" stroke-dasharray="4 4">
+          <line x1="200" y1="150" x2="320" y2="225" class="flow-line ${loadActive ? 'active' : ''}" stroke-dasharray="4 4">
             ${loadActive ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ''}
           </line>
         </svg>
@@ -364,31 +447,58 @@ class SolarChargeCard extends HTMLElement {
     `;
   }
 
-  private _evChargerIcon(charging: boolean, soc: number): string {
-    const socDisplay = soc > 0 ? `${Math.round(soc)}%` : '';
+  private _batteryIcon(soc: number, charging: boolean, discharging: boolean): string {
+    const socDisplay = `${Math.round(soc)}%`;
+    // Calculate how many bars to show (5 bars total)
+    const bars = Math.ceil(soc / 20); // 0-20% = 1 bar, 21-40% = 2 bars, etc.
+    
     return `
-      <svg viewBox="0 0 24 24">
-        <g>
-          <!-- EV Charger body -->
-          <path d="M16.5,3H8.5A1.5,1.5 0 0,0 7,4.5V19.5A1.5,1.5 0 0,0 8.5,21H16.5A1.5,1.5 0 0,0 18,19.5V4.5A1.5,1.5 0 0,0 16.5,3Z" fill="currentColor" opacity="0.2"/>
-          <path d="M16.5,3H8.5A1.5,1.5 0 0,0 7,4.5V19.5A1.5,1.5 0 0,0 8.5,21H16.5A1.5,1.5 0 0,0 18,19.5V4.5A1.5,1.5 0 0,0 16.5,3M16,19H9V5H16V19Z" fill="currentColor"/>
-          
-          <!-- Charging plug cable -->
-          <path d="M18,7H20V8H22V16H20V17H18V7M20,9.5V10.5H21V9.5H20M20,11.5V12.5H21V11.5H20M20,13.5V14.5H21V13.5H20Z" fill="currentColor"/>
-          
-          ${charging ? `
-            <!-- Lightning bolt when charging -->
-            <path d="M14,8L11,13H13L11,18L16,11H14L14,8Z" fill="currentColor"/>
-          ` : socDisplay ? `
-            <!-- Battery level indicator -->
-            <rect x="10" y="7" width="5" height="10" fill="currentColor" opacity="0.15"/>
-            ${soc > 80 ? '<rect x="10" y="7" width="5" height="2" fill="currentColor"/>' : ''}
-            ${soc > 60 ? '<rect x="10" y="9.5" width="5" height="2" fill="currentColor"/>' : ''}
-            ${soc > 40 ? '<rect x="10" y="12" width="5" height="2" fill="currentColor"/>' : ''}
-            ${soc > 20 ? '<rect x="10" y="14.5" width="5" height="2" fill="currentColor"/>' : ''}
-          ` : ''}
-        </g>
-        ${socDisplay ? `<text x="12.5" y="22" text-anchor="middle" font-size="4" fill="currentColor" font-weight="bold">${socDisplay}</text>` : ''}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Battery outline -->
+        <rect x="6" y="6" width="13" height="12" rx="1.5" stroke-width="1.8"/>
+        <!-- Battery terminal -->
+        <path d="M19 10 L21 10 L21 14 L19 14" stroke-width="1.8"/>
+        
+        <!-- Battery bars (filled based on SOC) -->
+        ${bars >= 1 ? '<rect x="7.5" y="15.5" width="2" height="4" fill="currentColor" stroke="none"/>' : ''}
+        ${bars >= 2 ? '<rect x="10" y="13.5" width="2" height="6" fill="currentColor" stroke="none"/>' : ''}
+        ${bars >= 3 ? '<rect x="12.5" y="11.5" width="2" height="8" fill="currentColor" stroke="none"/>' : ''}
+        ${bars >= 4 ? '<rect x="15" y="9.5" width="2" height="10" fill="currentColor" stroke="none"/>' : ''}
+        ${bars >= 5 ? '<rect x="17.5" y="7.5" width="2" height="12" fill="currentColor" stroke="none"/>' : ''}
+        
+        <!-- Charging/Discharging indicator -->
+        ${charging ? `
+          <path d="M11 3 L9 6 L10.5 6 L9 9 L12 5 L10.5 5 Z" fill="currentColor" stroke="none"/>
+        ` : discharging ? `
+          <circle cx="10.5" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="6" r="0.7" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="8" r="0.7" fill="currentColor" stroke="none"/>
+        ` : ''}
+        
+        <!-- SOC percentage -->
+        <text x="12.5" y="23.5" text-anchor="middle" font-size="3.5" fill="currentColor" font-weight="bold" stroke="none">${socDisplay}</text>
+      </svg>
+    `;
+  }
+
+  private _evChargerIcon(charging: boolean): string {
+    return `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Base platform -->
+        <rect x="6" y="19" width="12" height="2" rx="0.5" fill="currentColor" stroke="none"/>
+        <!-- Main charger body -->
+        <rect x="8" y="8" width="8" height="11" rx="1" stroke-width="1.5"/>
+        <!-- Top cap -->
+        <path d="M8 8 L8 6 C8 5.5 8.5 5 9 5 L15 5 C15.5 5 16 5.5 16 6 L16 8"/>
+        <!-- Display screen -->
+        <rect x="9.5" y="9.5" width="5" height="3" rx="0.3"/>
+        <!-- Charging cable -->
+        <path d="M16 12 Q18 12 18 14 L18 16" stroke-width="1.5"/>
+        <circle cx="18" cy="16.5" r="0.8" fill="currentColor" stroke="none"/>
+        ${charging ? `
+          <!-- Lightning bolt when charging -->
+          <path d="M13 14 L11 16.5 L12 16.5 L11 19 L14 15.5 L13 15.5 Z" fill="currentColor" stroke="none"/>
+        ` : ''}
       </svg>
     `;
   }
@@ -601,12 +711,18 @@ const CARD_CSS = `
 
   .flow-node.battery {
     bottom: 0;
-    left: 10%;
+    left: 5%;
+  }
+
+  .flow-node.charger {
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .flow-node.load {
     bottom: 0;
-    right: 10%;
+    right: 5%;
   }
 
   .flow-icon {
@@ -640,6 +756,13 @@ const CARD_CSS = `
     color: #2563eb;
     background: rgba(37, 99, 235, 0.08);
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  .flow-node.discharging .flow-icon {
+    border-color: #f59e0b;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
   }
 
   .flow-icon svg {

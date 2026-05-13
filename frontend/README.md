@@ -55,10 +55,18 @@ entities:
   gridImport: sensor.grid_power
   chargerPower: sensor.ev_charger_power
   loadPower: sensor.home_load
-  batterySoc: sensor.battery_percentage
+  # Battery from your inverter (e.g., Deye, Solis, etc.)
+  batterySoc: sensor.deye_battery_soc
+  batteryPower: sensor.deye_battery_power  # Positive = charging, Negative = discharging
   mode: select.charging_mode
   controlEnabled: switch.charging_control
 ```
+
+**Important**: The `batteryPower` sensor should report:
+- **Positive values** when battery is charging
+- **Negative values** when battery is discharging
+
+This is typically how most inverters report battery power.
 
 ## Power Flow Diagram
 
@@ -69,16 +77,21 @@ The power flow diagram shows:
   - Blue when exporting to grid
   - Green when importing from grid
 - **Home**: Central hub showing your home (center)
-- **EV Charger**: Shows charging power with battery icon and SOC% (bottom left)
+- **Battery**: Shows your inverter battery with dynamic level bars and SOC% (bottom left)
+  - Green when charging
+  - Orange when discharging
+- **EV Charger**: Shows EV charging power (bottom center)
 - **Home Load**: Shows current household consumption (bottom right)
 
 Flow lines are animated when power is actively flowing in that direction.
 
 ### Visual Indicators
 
-- **Green glow**: Active power flow
+- **Green glow**: Active power flow (charging, importing, consuming)
 - **Blue glow**: Exporting power to grid
+- **Orange glow**: Battery discharging
 - **Animated lines**: Direction and presence of power flow
+- **Battery bars**: 1-5 bars showing battery charge level (0-100%)
 - **Values**: Real-time power readings in W or kW
 
 ## Development

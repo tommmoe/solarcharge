@@ -1,10 +1,10 @@
-const u = [
+const w = [
   { label: "Off", option: "Off" },
   { label: "Solar", option: "Solar only" },
   { label: "Free", option: "Free hours only" },
   { label: "Hybrid", option: "Free hours or solar" },
   { label: "Force", option: "Force charge" }
-], g = {
+], u = {
   status: ["sensor", "status"],
   reason: ["sensor", "reason"],
   gridImport: ["sensor", "grid_import"],
@@ -18,6 +18,7 @@ const u = [
   pvPower: ["sensor", "pv_power"],
   loadPower: ["sensor", "load_power"],
   batterySoc: ["sensor", "battery_soc"],
+  batteryPower: ["sensor", "battery_power"],
   chargerStatus: ["sensor", "charger_status"],
   allowedToCharge: ["binary_sensor", "allowed_to_charge"],
   inFreeWindow: ["binary_sensor", "in_free_window"],
@@ -29,23 +30,23 @@ const u = [
 };
 class b extends HTMLElement {
   constructor() {
-    var t;
-    super(), this.attachShadow({ mode: "open" }), (t = this.shadowRoot) == null || t.addEventListener("click", (e) => {
-      this._handleClick(e);
+    var e;
+    super(), this.attachShadow({ mode: "open" }), (e = this.shadowRoot) == null || e.addEventListener("click", (t) => {
+      this._handleClick(t);
     });
   }
-  setConfig(t) {
-    var e;
-    if (!t.entity && !((e = t.entities) != null && e.status))
+  setConfig(e) {
+    var t;
+    if (!e.entity && !((t = e.entities) != null && t.status))
       throw new Error("Solar Charge card requires an entity or entities.status");
     this._config = {
       title: "Solar Charge",
       show_controls: !0,
-      ...t
+      ...e
     }, this._render();
   }
-  set hass(t) {
-    this._hass = t, this._render();
+  set hass(e) {
+    this._hass = e, this._render();
   }
   getCardSize() {
     return 6;
@@ -58,15 +59,15 @@ class b extends HTMLElement {
       show_controls: !0
     };
   }
-  async _handleClick(t) {
-    const e = t.composedPath().find(
+  async _handleClick(e) {
+    const t = e.composedPath().find(
       (o) => o instanceof HTMLElement && o.dataset.action
     );
-    if (!e || !this._hass)
+    if (!t || !this._hass)
       return;
-    const r = this._entities(), a = e.dataset.action;
-    if (a === "mode") {
-      const o = e.dataset.option;
+    const r = this._entities(), i = t.dataset.action;
+    if (i === "mode") {
+      const o = t.dataset.option;
       if (!o || !r.mode)
         return;
       await this._hass.callService("select", "select_option", {
@@ -75,7 +76,7 @@ class b extends HTMLElement {
       });
       return;
     }
-    if (a === "toggle-control" && r.controlEnabled) {
+    if (i === "toggle-control" && r.controlEnabled) {
       const o = this._isOn(r.controlEnabled);
       await this._hass.callService("switch", o ? "turn_off" : "turn_on", {
         entity_id: r.controlEnabled
@@ -85,29 +86,29 @@ class b extends HTMLElement {
   _render() {
     if (!this.shadowRoot || !this._config)
       return;
-    const t = this._entities(), e = this._stateText(t.status), r = this._stateText(t.reason), a = this._isOn(t.allowedToCharge), o = this._isOn(t.controlEnabled), i = this._stateText(t.mode), l = this._stateText(t.chargerStatus), d = this._isCarConnected(l), s = this._number(t.gridImport), c = this._isOn(t.gridSensorOk) && this._isOn(t.chargerSensorOk) && this._isOn(t.breakerLimitOk), p = c ? a ? "active" : "idle" : "danger", m = this._config.show_controls !== !1;
+    const e = this._entities(), t = this._stateText(e.status), r = this._stateText(e.reason), i = this._isOn(e.allowedToCharge), o = this._isOn(e.controlEnabled), s = this._stateText(e.mode), p = this._stateText(e.chargerStatus), d = this._isCarConnected(p), f = this._number(e.gridImport), a = this._isOn(e.gridSensorOk) && this._isOn(e.chargerSensorOk) && this._isOn(e.breakerLimitOk), c = a ? i ? "active" : "idle" : "danger", h = this._config.show_controls !== !1;
     this.shadowRoot.innerHTML = `
-      <style>${w}</style>
-      <article class="card ${p}">
+      <style>${x}</style>
+      <article class="card ${c}">
         <header class="header">
           <div>
-            <h2>${n(this._config.title || "Solar Charge")}</h2>
-            <p>${n(e)}</p>
+            <h2>${l(this._config.title || "Solar Charge")}</h2>
+            <p>${l(t)}</p>
           </div>
-          <div class="status-pill ${p}">
+          <div class="status-pill ${c}">
             <span></span>
-            ${a ? "Allowed" : c ? "Waiting" : "Check"}
+            ${i ? "Allowed" : a ? "Waiting" : "Check"}
           </div>
         </header>
 
         <section class="power-flow">
-          ${this._renderPowerFlow(t)}
+          ${this._renderPowerFlow(e)}
         </section>
 
         <section class="mode-row">
           <div>
             <span class="label">Mode</span>
-            <strong>${n(i)}</strong>
+            <strong>${l(s)}</strong>
           </div>
           <div>
             <span class="label">Control</span>
@@ -120,45 +121,45 @@ class b extends HTMLElement {
         </section>
 
         <section class="primary">
-          ${this._metric("Grid", this._formatPower(t.gridImport), s < 0 ? "exporting" : "importing")}
-          ${this._metric("EV charging", this._formatPower(t.chargerPower), "live charger load")}
-          ${this._metric("Target", this._formatCurrent(t.targetAmps), "calculated limit")}
+          ${this._metric("Grid", this._formatPower(e.gridImport), f < 0 ? "exporting" : "importing")}
+          ${this._metric("EV charging", this._formatPower(e.chargerPower), "live charger load")}
+          ${this._metric("Target", this._formatCurrent(e.targetAmps), "calculated limit")}
         </section>
 
         <section class="metrics">
-          ${this._metric("Base import", this._formatPower(t.baseGridImport), "excluding EV")}
-          ${this._metric("Safe limit", this._formatPower(t.safeImportLimit), "breaker protected")}
-          ${this._metric("Spare", this._formatPower(t.spareCapacity), "after buffer")}
-          ${this._metric("Actual", this._formatCurrent(t.actualCurrent), "charger current")}
-          ${this._metric("Offered", this._formatCurrent(t.offeredCurrent), "OCPP limit")}
-          ${this._metric("Solar", this._formatPower(t.pvPower), "PV power")}
-          ${this._metric("Load", this._formatPower(t.loadPower), "house consumption")}
-          ${this._metric("Battery", this._formatPercent(t.batterySoc), "state of charge")}
+          ${this._metric("Base import", this._formatPower(e.baseGridImport), "excluding EV")}
+          ${this._metric("Safe limit", this._formatPower(e.safeImportLimit), "breaker protected")}
+          ${this._metric("Spare", this._formatPower(e.spareCapacity), "after buffer")}
+          ${this._metric("Actual", this._formatCurrent(e.actualCurrent), "charger current")}
+          ${this._metric("Offered", this._formatCurrent(e.offeredCurrent), "OCPP limit")}
+          ${this._metric("Solar", this._formatPower(e.pvPower), "PV power")}
+          ${this._metric("Load", this._formatPower(e.loadPower), "house consumption")}
+          ${this._metric("Battery", this._formatPercent(e.batterySoc), "state of charge")}
         </section>
 
         <section class="reason">
           <span class="label">Reason</span>
-          <p>${n(r)}</p>
+          <p>${l(r)}</p>
         </section>
 
         <section class="safety">
-          ${this._safetyItem("Grid sensor", this._isOn(t.gridSensorOk))}
-          ${this._safetyItem("Charger", this._isOn(t.chargerSensorOk))}
-          ${this._safetyItem("Breaker", this._isOn(t.breakerLimitOk))}
-          ${this._safetyItem("Free window", this._isOn(t.inFreeWindow))}
+          ${this._safetyItem("Grid sensor", this._isOn(e.gridSensorOk))}
+          ${this._safetyItem("Charger", this._isOn(e.chargerSensorOk))}
+          ${this._safetyItem("Breaker", this._isOn(e.breakerLimitOk))}
+          ${this._safetyItem("Free window", this._isOn(e.inFreeWindow))}
         </section>
 
-        ${m ? `<section class="controls">
+        ${h ? `<section class="controls">
                 <div class="mode-buttons">
-                  ${u.map(
-      (h) => `
+                  ${w.map(
+      (n) => `
                       <button
-                        class="${i === h.option ? "selected" : ""}"
+                        class="${s === n.option ? "selected" : ""}"
                         data-action="mode"
-                        data-option="${h.option}"
+                        data-option="${n.option}"
                         type="button"
                       >
-                        ${h.label}
+                        ${n.label}
                       </button>
                     `
     ).join("")}
@@ -174,200 +175,301 @@ class b extends HTMLElement {
       </article>
     `;
   }
-  _renderPowerFlow(t) {
-    const e = this._number(t.pvPower), r = this._number(t.gridImport), a = this._number(t.chargerPower), o = this._number(t.loadPower), i = this._number(t.batterySoc), l = e > 50, d = Math.abs(r) > 50, s = r < -50, c = a > 50, p = o > 50;
+  _renderPowerFlow(e) {
+    const t = this._number(e.pvPower), r = this._number(e.gridImport), i = this._number(e.batteryPower), o = this._number(e.chargerPower), s = this._number(e.loadPower), p = this._number(e.batterySoc), d = t > 50, f = Math.abs(r) > 50, a = r < -50, c = i > 50, h = i < -50, n = o > 50, g = s > 50;
     return `
       <div class="flow-diagram">
         <!-- Solar -->
-        <div class="flow-node solar ${l ? "active" : ""}">
+        <div class="flow-node solar ${d ? "active" : ""}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,2L14.39,5.42C13.65,5.15 12.84,5 12,5C11.16,5 10.35,5.15 9.61,5.42L12,2M3.34,7L7.5,6.65C6.9,7.16 6.36,7.78 5.94,8.5C5.5,9.24 5.25,10 5.11,10.79L3.34,7M3.36,17L5.12,13.23C5.26,14 5.53,14.78 5.95,15.5C6.37,16.24 6.91,16.86 7.5,17.37L3.36,17M20.65,7L18.88,10.79C18.74,10 18.47,9.23 18.05,8.5C17.63,7.78 17.1,7.15 16.5,6.64L20.65,7M20.64,17L16.5,17.36C17.09,16.85 17.62,16.22 18.04,15.5C18.46,14.77 18.73,14 18.87,13.21L20.64,17M12,22L9.59,18.56C10.33,18.83 11.14,19 12,19C12.82,19 13.63,18.83 14.37,18.56L12,22Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Sun -->
+              <circle cx="12" cy="6" r="2.5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="18" y1="6" x2="16.5" y2="6"/>
+              <line x1="15.5" y1="3.5" x2="14.5" y2="4.5"/>
+              <line x1="15.5" y1="8.5" x2="14.5" y2="7.5"/>
+              <line x1="6" y1="6" x2="7.5" y2="6"/>
+              <line x1="8.5" y1="3.5" x2="9.5" y2="4.5"/>
+              <line x1="8.5" y1="8.5" x2="9.5" y2="7.5"/>
+              <!-- Solar panel stand -->
+              <path d="M12 11 L12 16"/>
+              <path d="M9 16 L15 16"/>
+              <path d="M10 16 L10 18"/>
+              <path d="M14 16 L14 18"/>
+              <path d="M8 18 L16 18"/>
+              <!-- Solar panel -->
+              <rect x="7" y="9.5" width="10" height="5" rx="0.5"/>
+              <line x1="9.5" y1="9.5" x2="9.5" y2="14.5"/>
+              <line x1="12" y1="9.5" x2="12" y2="14.5"/>
+              <line x1="14.5" y1="9.5" x2="14.5" y2="14.5"/>
+              <line x1="7" y1="12" x2="17" y2="12"/>
             </svg>
           </div>
-          <div class="flow-value">${this._formatPower(t.pvPower)}</div>
+          <div class="flow-value">${this._formatPower(e.pvPower)}</div>
           <div class="flow-label">Production</div>
         </div>
 
         <!-- Grid -->
-        <div class="flow-node grid ${d ? s ? "exporting" : "importing" : ""}">
+        <div class="flow-node grid ${f ? a ? "exporting" : "importing" : ""}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M8,2V4.43C5.17,5.92 3.2,8.77 3.03,12.07L1,12A1,1 0 0,0 1,14H3.03C3.42,18.73 7.39,22.5 12.16,22.5C17.21,22.5 21.29,18.42 21.29,13.37C21.29,10.4 19.82,7.77 17.57,6.11L19.04,4.63C19.43,4.24 19.43,3.62 19.04,3.23L18.08,2.27C17.69,1.88 17.07,1.88 16.68,2.27L15.25,3.7C14.33,3.26 13.27,3 12.16,3C10.26,3 8.5,3.68 7.12,4.81L8,2M12.16,5C16.1,5 19.29,8.19 19.29,12.12C19.29,16.06 16.1,19.25 12.16,19.25C8.23,19.25 5.04,16.06 5.04,12.12C5.04,10 5.95,8.08 7.43,6.76L11.29,10.62C11.1,11 11,11.46 11,12A2,2 0 0,0 13,14A2,2 0 0,0 15,12A2,2 0 0,0 13,10C12.46,10 12,10.1 11.62,10.29L7.76,6.43C8.94,5.58 10.5,5 12.16,5Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Transmission tower -->
+              <path d="M12 2 L12 22"/>
+              <!-- Top crossbar -->
+              <path d="M6 6 L18 6"/>
+              <path d="M6 6 L8 4"/>
+              <path d="M18 6 L16 4"/>
+              <!-- Power lines from top -->
+              <path d="M6 6 L4 7"/>
+              <path d="M18 6 L20 7"/>
+              <!-- Middle crossbar -->
+              <path d="M7 11 L17 11"/>
+              <path d="M7 11 L5 12"/>
+              <path d="M17 11 L19 12"/>
+              <!-- Lower crossbar -->
+              <path d="M8 16 L16 16"/>
+              <path d="M8 16 L6 17"/>
+              <path d="M16 16 L18 17"/>
+              <!-- Tower structure -->
+              <path d="M10 8 L12 6 L14 8"/>
+              <path d="M9.5 13 L12 11 L14.5 13"/>
+              <path d="M9 18 L12 16 L15 18"/>
+              <!-- Base -->
+              <path d="M8 22 L16 22"/>
             </svg>
           </div>
-          <div class="flow-value">${this._formatPower(t.gridImport)}</div>
-          <div class="flow-label">${s ? "Export" : "Grid"}</div>
+          <div class="flow-value">${this._formatPower(e.gridImport)}</div>
+          <div class="flow-label">${a ? "Export" : "Grid"}</div>
         </div>
 
         <!-- Center Home -->
         <div class="flow-node home">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M10,20V14H14V20H19V12H22L12,3L2,12H5V20H10Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- House -->
+              <path d="M3 12 L12 3 L21 12"/>
+              <path d="M5 10 L5 20 C5 20.5 5.5 21 6 21 L18 21 C18.5 21 19 20.5 19 20 L19 10"/>
+              <!-- Chimney -->
+              <rect x="15" y="5" width="2" height="3"/>
+              <!-- Power plug -->
+              <circle cx="12" cy="14" r="3.5" fill="none" stroke-width="1.5"/>
+              <rect x="10.5" y="11" width="1" height="1.5" fill="currentColor" stroke="none"/>
+              <rect x="12.5" y="11" width="1" height="1.5" fill="currentColor" stroke="none"/>
+              <path d="M12 17.5 L12 19.5" stroke-width="1.5"/>
+              <path d="M10.5 19.5 L13.5 19.5" stroke-width="1.5"/>
             </svg>
           </div>
         </div>
 
-        <!-- Battery/Charger -->
-        <div class="flow-node battery ${c ? "active" : ""}">
+        <!-- Battery -->
+        <div class="flow-node battery ${c ? "active charging" : h ? "active discharging" : ""}">
           <div class="flow-icon">
-            ${this._evChargerIcon(c, i)}
+            ${this._batteryIcon(p, c, h)}
           </div>
-          <div class="flow-value">${this._formatPower(t.chargerPower)}</div>
+          <div class="flow-value">${this._formatPower(e.batteryPower)}</div>
+          <div class="flow-label">Battery</div>
+        </div>
+
+        <!-- EV Charger -->
+        <div class="flow-node charger ${n ? "active" : ""}">
+          <div class="flow-icon">
+            ${this._evChargerIcon(n)}
+          </div>
+          <div class="flow-value">${this._formatPower(e.chargerPower)}</div>
           <div class="flow-label">EV Charger</div>
         </div>
 
         <!-- Load -->
-        <div class="flow-node load ${p ? "active" : ""}">
+        <div class="flow-node load ${g ? "active" : ""}">
           <div class="flow-icon">
-            <svg viewBox="0 0 24 24">
-              <path d="M9.3,10.8L8,11.3L6,9L4,11.3L2.7,10.8L5,7.8L9.3,10.8M14,10.8L15.3,11.3L17.3,9L19.3,11.3L20.6,10.8L16.3,7.8L14,10.8M12,14C9.8,14 8,15.8 8,18C8,20.2 9.8,22 12,22A4,4 0 0,0 16,18C16,15.8 14.2,14 12,14M12,20C10.9,20 10,19.1 10,18C10,16.9 10.9,16 12,16C13.1,16 14,16.9 14,18C14,19.1 13.1,20 12,20M9,2V4H11V8A1,1 0 0,1 10,9H8A1,1 0 0,1 7,8V4H9V2M15,2V4H17V8A1,1 0 0,1 16,9H14A1,1 0 0,1 13,8V4H15V2Z" fill="currentColor"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- House outline -->
+              <path d="M3 12 L12 3 L21 12 L21 20 C21 20.5 20.5 21 20 21 L4 21 C3.5 21 3 20.5 3 20 Z"/>
+              <!-- Power plug in center -->
+              <circle cx="12" cy="14" r="3" fill="none"/>
+              <rect x="10.8" y="11.5" width="0.8" height="1.2" fill="currentColor" stroke="none"/>
+              <rect x="12.4" y="11.5" width="0.8" height="1.2" fill="currentColor" stroke="none"/>
+              <line x1="12" y1="17" x2="12" y2="18.5"/>
+              <line x1="10.5" y1="18.5" x2="13.5" y2="18.5"/>
             </svg>
           </div>
-          <div class="flow-value">${this._formatPower(t.loadPower)}</div>
+          <div class="flow-value">${this._formatPower(e.loadPower)}</div>
           <div class="flow-label">Load</div>
         </div>
 
         <!-- Flow lines -->
         <svg class="flow-lines" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
           <!-- Solar to Home -->
-          <line x1="100" y1="75" x2="200" y2="150" class="flow-line ${l ? "active" : ""}" stroke-dasharray="4 4">
-            ${l ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          <line x1="80" y1="75" x2="200" y2="150" class="flow-line ${d ? "active" : ""}" stroke-dasharray="4 4">
+            ${d ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
           </line>
           
           <!-- Grid to Home -->
-          <line x1="300" y1="75" x2="200" y2="150" class="flow-line ${d && !s ? "active" : ""}" stroke-dasharray="4 4">
-            ${d && !s ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          <line x1="320" y1="75" x2="200" y2="150" class="flow-line ${f && !a ? "active" : ""}" stroke-dasharray="4 4">
+            ${f && !a ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
           </line>
           
           <!-- Home to Grid (export) -->
-          <line x1="200" y1="150" x2="300" y2="75" class="flow-line ${s ? "active export" : ""}" stroke-dasharray="4 4">
-            ${s ? '<animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>' : ""}
+          <line x1="200" y1="150" x2="320" y2="75" class="flow-line ${a ? "active export" : ""}" stroke-dasharray="4 4">
+            ${a ? '<animate attributeName="stroke-dashoffset" from="8" to="0" dur="1s" repeatCount="indefinite"/>' : ""}
           </line>
           
-          <!-- Home to Battery/Charger -->
-          <line x1="200" y1="150" x2="100" y2="225" class="flow-line ${c ? "active" : ""}" stroke-dasharray="4 4">
+          <!-- Home to Battery (charging) -->
+          <line x1="200" y1="150" x2="80" y2="225" class="flow-line ${c ? "active" : ""}" stroke-dasharray="4 4">
             ${c ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
           </line>
           
+          <!-- Battery to Home (discharging) -->
+          <line x1="80" y1="225" x2="200" y2="150" class="flow-line ${h ? "active" : ""}" stroke-dasharray="4 4">
+            ${h ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+          
+          <!-- Home to Charger -->
+          <line x1="200" y1="150" x2="200" y2="225" class="flow-line ${n ? "active" : ""}" stroke-dasharray="4 4">
+            ${n ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          </line>
+          
           <!-- Home to Load -->
-          <line x1="200" y1="150" x2="300" y2="225" class="flow-line ${p ? "active" : ""}" stroke-dasharray="4 4">
-            ${p ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
+          <line x1="200" y1="150" x2="320" y2="225" class="flow-line ${g ? "active" : ""}" stroke-dasharray="4 4">
+            ${g ? '<animate attributeName="stroke-dashoffset" from="0" to="8" dur="1s" repeatCount="indefinite"/>' : ""}
           </line>
         </svg>
       </div>
     `;
   }
-  _evChargerIcon(t, e) {
-    const r = e > 0 ? `${Math.round(e)}%` : "";
+  _batteryIcon(e, t, r) {
+    const i = `${Math.round(e)}%`, o = Math.ceil(e / 20);
     return `
-      <svg viewBox="0 0 24 24">
-        <g>
-          <!-- EV Charger body -->
-          <path d="M16.5,3H8.5A1.5,1.5 0 0,0 7,4.5V19.5A1.5,1.5 0 0,0 8.5,21H16.5A1.5,1.5 0 0,0 18,19.5V4.5A1.5,1.5 0 0,0 16.5,3Z" fill="currentColor" opacity="0.2"/>
-          <path d="M16.5,3H8.5A1.5,1.5 0 0,0 7,4.5V19.5A1.5,1.5 0 0,0 8.5,21H16.5A1.5,1.5 0 0,0 18,19.5V4.5A1.5,1.5 0 0,0 16.5,3M16,19H9V5H16V19Z" fill="currentColor"/>
-          
-          <!-- Charging plug cable -->
-          <path d="M18,7H20V8H22V16H20V17H18V7M20,9.5V10.5H21V9.5H20M20,11.5V12.5H21V11.5H20M20,13.5V14.5H21V13.5H20Z" fill="currentColor"/>
-          
-          ${t ? `
-            <!-- Lightning bolt when charging -->
-            <path d="M14,8L11,13H13L11,18L16,11H14L14,8Z" fill="currentColor"/>
-          ` : r ? `
-            <!-- Battery level indicator -->
-            <rect x="10" y="7" width="5" height="10" fill="currentColor" opacity="0.15"/>
-            ${e > 80 ? '<rect x="10" y="7" width="5" height="2" fill="currentColor"/>' : ""}
-            ${e > 60 ? '<rect x="10" y="9.5" width="5" height="2" fill="currentColor"/>' : ""}
-            ${e > 40 ? '<rect x="10" y="12" width="5" height="2" fill="currentColor"/>' : ""}
-            ${e > 20 ? '<rect x="10" y="14.5" width="5" height="2" fill="currentColor"/>' : ""}
-          ` : ""}
-        </g>
-        ${r ? `<text x="12.5" y="22" text-anchor="middle" font-size="4" fill="currentColor" font-weight="bold">${r}</text>` : ""}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Battery outline -->
+        <rect x="6" y="6" width="13" height="12" rx="1.5" stroke-width="1.8"/>
+        <!-- Battery terminal -->
+        <path d="M19 10 L21 10 L21 14 L19 14" stroke-width="1.8"/>
+        
+        <!-- Battery bars (filled based on SOC) -->
+        ${o >= 1 ? '<rect x="7.5" y="15.5" width="2" height="4" fill="currentColor" stroke="none"/>' : ""}
+        ${o >= 2 ? '<rect x="10" y="13.5" width="2" height="6" fill="currentColor" stroke="none"/>' : ""}
+        ${o >= 3 ? '<rect x="12.5" y="11.5" width="2" height="8" fill="currentColor" stroke="none"/>' : ""}
+        ${o >= 4 ? '<rect x="15" y="9.5" width="2" height="10" fill="currentColor" stroke="none"/>' : ""}
+        ${o >= 5 ? '<rect x="17.5" y="7.5" width="2" height="12" fill="currentColor" stroke="none"/>' : ""}
+        
+        <!-- Charging/Discharging indicator -->
+        ${t ? `
+          <path d="M11 3 L9 6 L10.5 6 L9 9 L12 5 L10.5 5 Z" fill="currentColor" stroke="none"/>
+        ` : r ? `
+          <circle cx="10.5" cy="4" r="0.7" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="6" r="0.7" fill="currentColor" stroke="none"/>
+          <circle cx="10.5" cy="8" r="0.7" fill="currentColor" stroke="none"/>
+        ` : ""}
+        
+        <!-- SOC percentage -->
+        <text x="12.5" y="23.5" text-anchor="middle" font-size="3.5" fill="currentColor" font-weight="bold" stroke="none">${i}</text>
+      </svg>
+    `;
+  }
+  _evChargerIcon(e) {
+    return `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Base platform -->
+        <rect x="6" y="19" width="12" height="2" rx="0.5" fill="currentColor" stroke="none"/>
+        <!-- Main charger body -->
+        <rect x="8" y="8" width="8" height="11" rx="1" stroke-width="1.5"/>
+        <!-- Top cap -->
+        <path d="M8 8 L8 6 C8 5.5 8.5 5 9 5 L15 5 C15.5 5 16 5.5 16 6 L16 8"/>
+        <!-- Display screen -->
+        <rect x="9.5" y="9.5" width="5" height="3" rx="0.3"/>
+        <!-- Charging cable -->
+        <path d="M16 12 Q18 12 18 14 L18 16" stroke-width="1.5"/>
+        <circle cx="18" cy="16.5" r="0.8" fill="currentColor" stroke="none"/>
+        ${e ? `
+          <!-- Lightning bolt when charging -->
+          <path d="M13 14 L11 16.5 L12 16.5 L11 19 L14 15.5 L13 15.5 Z" fill="currentColor" stroke="none"/>
+        ` : ""}
       </svg>
     `;
   }
   _entities() {
-    var a, o;
-    const t = ((a = this._config) == null ? void 0 : a.entities) || {}, e = this._baseObjectId(), r = {};
-    for (const i of Object.keys(g)) {
-      const [l, d] = g[i];
-      r[i] = t[i] || (e ? `${l}.${e}_${d}` : void 0);
+    var i, o;
+    const e = ((i = this._config) == null ? void 0 : i.entities) || {}, t = this._baseObjectId(), r = {};
+    for (const s of Object.keys(u)) {
+      const [p, d] = u[s];
+      r[s] = e[s] || (t ? `${p}.${t}_${d}` : void 0);
     }
-    return (o = this._config) != null && o.entity && (r.status = t.status || this._config.entity), r;
+    return (o = this._config) != null && o.entity && (r.status = e.status || this._config.entity), r;
   }
   _baseObjectId() {
-    var r, a, o;
-    const t = ((a = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : a.status) || ((o = this._config) == null ? void 0 : o.entity);
-    if (!t)
+    var r, i, o;
+    const e = ((i = (r = this._config) == null ? void 0 : r.entities) == null ? void 0 : i.status) || ((o = this._config) == null ? void 0 : o.entity);
+    if (!e)
       return;
-    const e = t.split(".")[1];
-    if (e)
-      return e.endsWith("_status") ? e.slice(0, -7) : e;
+    const t = e.split(".")[1];
+    if (t)
+      return t.endsWith("_status") ? t.slice(0, -7) : t;
   }
-  _metric(t, e, r) {
+  _metric(e, t, r) {
     return `
       <div class="metric">
-        <span class="label">${n(t)}</span>
-        <strong>${n(e)}</strong>
-        <small>${n(r)}</small>
+        <span class="label">${l(e)}</span>
+        <strong>${l(t)}</strong>
+        <small>${l(r)}</small>
       </div>
     `;
   }
-  _safetyItem(t, e) {
+  _safetyItem(e, t) {
     return `
-      <div class="safety-item ${e ? "ok" : "bad"}">
+      <div class="safety-item ${t ? "ok" : "bad"}">
         <span></span>
-        ${n(t)}
+        ${l(e)}
       </div>
     `;
   }
-  _state(t) {
-    var e;
-    return t ? (e = this._hass) == null ? void 0 : e.states[t] : void 0;
+  _state(e) {
+    var t;
+    return e ? (t = this._hass) == null ? void 0 : t.states[e] : void 0;
   }
-  _stateText(t) {
-    const e = this._state(t);
-    return !e || e.state === "unknown" || e.state === "unavailable" ? "-" : e.state;
+  _stateText(e) {
+    const t = this._state(e);
+    return !t || t.state === "unknown" || t.state === "unavailable" ? "-" : t.state;
   }
-  _isOn(t) {
-    var e;
-    return ((e = this._state(t)) == null ? void 0 : e.state) === "on";
+  _isOn(e) {
+    var t;
+    return ((t = this._state(e)) == null ? void 0 : t.state) === "on";
   }
-  _number(t) {
+  _number(e) {
     var r;
-    const e = Number((r = this._state(t)) == null ? void 0 : r.state);
-    return Number.isFinite(e) ? e : 0;
+    const t = Number((r = this._state(e)) == null ? void 0 : r.state);
+    return Number.isFinite(t) ? t : 0;
   }
-  _formatPower(t) {
-    const e = this._state(t), r = Number(e == null ? void 0 : e.state);
-    if (!e || !Number.isFinite(r))
+  _formatPower(e) {
+    const t = this._state(e), r = Number(t == null ? void 0 : t.state);
+    if (!t || !Number.isFinite(r))
       return "-";
-    const o = String(e.attributes.unit_of_measurement || "W").toLowerCase() === "kw" ? r * 1e3 : r;
+    const o = String(t.attributes.unit_of_measurement || "W").toLowerCase() === "kw" ? r * 1e3 : r;
     return Math.abs(o) >= 1e3 ? `${(o / 1e3).toFixed(1)} kW` : `${Math.round(o)} W`;
   }
-  _formatCurrent(t) {
-    const e = this._state(t), r = Number(e == null ? void 0 : e.state);
-    return !e || !Number.isFinite(r) ? "-" : `${Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r).toString() : r.toFixed(1)} A`;
+  _formatCurrent(e) {
+    const t = this._state(e), r = Number(t == null ? void 0 : t.state);
+    return !t || !Number.isFinite(r) ? "-" : `${Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r).toString() : r.toFixed(1)} A`;
   }
-  _formatPercent(t) {
-    const e = this._state(t), r = Number(e == null ? void 0 : e.state);
-    return !e || !Number.isFinite(r) ? "-" : `${Math.round(r)}%`;
+  _formatPercent(e) {
+    const t = this._state(e), r = Number(t == null ? void 0 : t.state);
+    return !t || !Number.isFinite(r) ? "-" : `${Math.round(r)}%`;
   }
-  _isCarConnected(t) {
-    if (!t || t === "-")
+  _isCarConnected(e) {
+    if (!e || e === "-")
       return !1;
-    const e = t.toLowerCase();
-    return !(e === "available" || (/* @__PURE__ */ new Set([
+    const t = e.toLowerCase();
+    return !(t === "available" || (/* @__PURE__ */ new Set([
       "unavailable",
       "disconnected",
       "not connected",
       "idle",
       "ready"
-    ])).has(e));
+    ])).has(t));
   }
 }
-const w = `
+const x = `
   :host {
     display: block;
     color: var(--primary-text-color, #1f2933);
@@ -437,12 +539,18 @@ const w = `
 
   .flow-node.battery {
     bottom: 0;
-    left: 10%;
+    left: 5%;
+  }
+
+  .flow-node.charger {
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
   }
 
   .flow-node.load {
     bottom: 0;
-    right: 10%;
+    right: 5%;
   }
 
   .flow-icon {
@@ -476,6 +584,13 @@ const w = `
     color: #2563eb;
     background: rgba(37, 99, 235, 0.08);
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  .flow-node.discharging .flow-icon {
+    border-color: #f59e0b;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
   }
 
   .flow-icon svg {
@@ -802,9 +917,9 @@ const w = `
     }
   }
 `;
-function n(f) {
-  return f.replace(/[&<>"']/g, (t) => {
-    switch (t) {
+function l(m) {
+  return m.replace(/[&<>"']/g, (e) => {
+    switch (e) {
       case "&":
         return "&amp;";
       case "<":

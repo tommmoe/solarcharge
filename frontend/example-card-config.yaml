@@ -6,6 +6,10 @@ type: custom:solar-charge-card
 entity: sensor.solar_charge_status
 title: "EV Charging"
 show_controls: true
+entities:
+  # Add your battery power sensor (e.g., from Deye inverter)
+  batteryPower: sensor.deye_battery_power  # Replace with your actual battery power sensor
+  batterySoc: sensor.deye_battery_soc      # Replace with your actual battery SOC sensor
 
 ---
 
@@ -32,8 +36,9 @@ entities:
   actualCurrent: sensor.solar_charge_actual_current
   offeredCurrent: sensor.solar_charge_offered_current
   
-  # Battery
+  # Battery (from inverter - e.g., Deye)
   batterySoc: sensor.solar_charge_battery_soc
+  batteryPower: sensor.solar_charge_battery_power  # Add your actual battery power sensor
   
   # Charger status
   chargerStatus: sensor.solar_charge_charger_status
