@@ -94,6 +94,7 @@
       "pv_power": { "name": "PV power" },
       "load_power": { "name": "Load power" },
       "battery_soc": { "name": "Battery SOC" },
+      "battery_power": { "name": "Battery power" },
       "charger_status": { "name": "Charger status" },
       "reason": { "name": "Reason" },
       "status": { "name": "Status" }
