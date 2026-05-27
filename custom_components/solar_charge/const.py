@@ -90,6 +90,27 @@ CONF_BATTERY_RESERVE_PCT = "battery_reserve_pct"
 CONF_START_DELAY_SECONDS = "start_delay_seconds"
 CONF_STOP_DELAY_SECONDS = "stop_delay_seconds"
 
+# ── Deye / inverter control ───────────────────────────────────────────────
+# Entity prefix used to auto-derive all Deye program-slot entity IDs.
+# e.g. prefix "deye" → select.deye_prog1_time, number.deye_prog1_capacity …
+CONF_DEYE_ENTITY_PREFIX = "deye_entity_prefix"
+
+# Whether the integration should write to the inverter program slots
+CONF_INVERTER_CONTROL_ENABLED = "inverter_control_enabled"
+
+# ── Overnight reserve ─────────────────────────────────────────────────────
+CONF_BATTERY_CAPACITY_KWH = "battery_capacity_kwh"
+"""Total usable battery capacity in kWh (e.g. 48.0 for a 48 kWh system)."""
+
+CONF_OVERNIGHT_RESERVE_MARGIN_PCT = "overnight_reserve_margin_pct"
+"""Safety margin added on top of the rolling average consumption (%)."""
+
+CONF_OVERNIGHT_RESERVE_DAYS = "overnight_reserve_days"
+"""Number of days in the rolling average window."""
+
+CONF_OVERNIGHT_RESERVE_FALLBACK_PCT = "overnight_reserve_fallback_pct"
+"""Reserve SOC% used until enough historical data is available."""
+
 DEFAULTS: dict[str, object] = {
     CONF_NAME: DEFAULT_NAME,
     CONF_MODE: MODE_FREE_HOURS_OR_SOLAR,
@@ -118,6 +139,14 @@ DEFAULTS: dict[str, object] = {
     CONF_BATTERY_RESERVE_PCT: None,
     CONF_START_DELAY_SECONDS: 0,
     CONF_STOP_DELAY_SECONDS: 0,
+    # Deye / inverter
+    CONF_DEYE_ENTITY_PREFIX: "",
+    CONF_INVERTER_CONTROL_ENABLED: False,
+    # Overnight reserve
+    CONF_BATTERY_CAPACITY_KWH: 48.0,
+    CONF_OVERNIGHT_RESERVE_MARGIN_PCT: 20.0,
+    CONF_OVERNIGHT_RESERVE_DAYS: 14,
+    CONF_OVERNIGHT_RESERVE_FALLBACK_PCT: 30,
 }
 
 POWER_UNIT_AUTO = "auto"

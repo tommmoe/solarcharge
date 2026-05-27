@@ -97,18 +97,26 @@
       "battery_power": { "name": "Battery power" },
       "charger_status": { "name": "Charger status" },
       "reason": { "name": "Reason" },
-      "status": { "name": "Status" }
+      "status": { "name": "Status" },
+      "overnight_avg_consumption": { "name": "Overnight avg consumption" },
+      "overnight_reserve_pct": { "name": "Overnight reserve" },
+      "overnight_snapshot_count": { "name": "Overnight snapshot count" },
+      "zerohero_import_kwh": { "name": "ZeroHero import (today)" },
+      "super_export_kwh": { "name": "Super export (today)" },
+      "current_inverter_slot": { "name": "Active inverter slot" }
     },
     "binary_sensor": {
       "allowed_to_charge": { "name": "Allowed to charge" },
       "in_free_window": { "name": "In free window" },
       "grid_sensor_ok": { "name": "Grid sensor OK" },
       "charger_sensor_ok": { "name": "Charger sensor OK" },
-      "breaker_limit_ok": { "name": "Breaker limit OK" }
+      "breaker_limit_ok": { "name": "Breaker limit OK" },
+      "zerohero_eligible": { "name": "ZeroHero credit eligible" }
     },
     "switch": {
       "enabled": { "name": "Enabled" },
-      "control_enabled": { "name": "Control enabled" }
+      "control_enabled": { "name": "EV control enabled" },
+      "inverter_control_enabled": { "name": "Inverter control enabled" }
     },
     "select": {
       "mode": { "name": "Mode" }

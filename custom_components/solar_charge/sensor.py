@@ -12,7 +12,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
+from homeassistant.const import UnitOfElectricCurrent, UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -137,6 +137,50 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         key="status",
         translation_key="status",
         value_fn=lambda data: data.get("status"),
+    ),
+    # ── Overnight reserve / tariff optimisation ──────────────────────────
+    SolarChargeSensorDescription(
+        key="overnight_avg_consumption",
+        translation_key="overnight_avg_consumption",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("overnight_avg_consumption_kwh"),
+    ),
+    SolarChargeSensorDescription(
+        key="overnight_reserve_pct",
+        translation_key="overnight_reserve_pct",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("overnight_reserve_pct"),
+    ),
+    SolarChargeSensorDescription(
+        key="overnight_snapshot_count",
+        translation_key="overnight_snapshot_count",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("overnight_snapshot_count"),
+    ),
+    SolarChargeSensorDescription(
+        key="zerohero_import_kwh",
+        translation_key="zerohero_import_kwh",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("zerohero_import_kwh"),
+    ),
+    SolarChargeSensorDescription(
+        key="super_export_kwh",
+        translation_key="super_export_kwh",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("super_export_kwh"),
+    ),
+    SolarChargeSensorDescription(
+        key="current_inverter_slot",
+        translation_key="current_inverter_slot",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("current_inverter_slot"),
     ),
 )
 

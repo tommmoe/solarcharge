@@ -24,6 +24,7 @@ from .calculations import (
     is_in_time_window,
 )
 from .const import (
+    CONF_BATTERY_CAPACITY_KWH,
     CONF_BATTERY_CHARGING_POSITIVE,
     CONF_BATTERY_POWER_ENTITY,
     CONF_BATTERY_POWER_MULTIPLIER,
@@ -53,6 +54,9 @@ from .const import (
     CONF_MIN_CHARGE_AMPS,
     CONF_MODE,
     CONF_NAME,
+    CONF_OVERNIGHT_RESERVE_DAYS,
+    CONF_OVERNIGHT_RESERVE_FALLBACK_PCT,
+    CONF_OVERNIGHT_RESERVE_MARGIN_PCT,
     CONF_PV_POWER_ENTITIES,
     CONF_PV_POWER_MULTIPLIER,
     CONF_SAFETY_MARGIN_AMPS,
@@ -65,6 +69,13 @@ from .const import (
     POWER_UNIT_W,
 )
 from .control import ChargeController
+from .inverter_controller import InverterController
+from .inverter_schedule import (
+    InverterScheduleInputs,
+    calculate_inverter_schedule,
+    current_slot_index,
+)
+from .overnight_tracker import OvernightTracker
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,6 +104,12 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ),
         )
         self.controller = ChargeController(hass, self)
+        self.inverter_controller = InverterController(hass, self)
+        self.overnight_tracker = OvernightTracker(
+            hass,
+            entry.entry_id,
+            float(self._settings.get(CONF_BATTERY_CAPACITY_KWH, 48.0)),
+        )
 
     @property
     def title(self) -> str:
@@ -105,6 +122,11 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Return merged settings."""
 
         return self._settings
+
+    async def async_config_entry_first_refresh(self) -> None:
+        """Load persisted overnight data before first update cycle."""
+        await self.overnight_tracker.async_load()
+        await super().async_config_entry_first_refresh()
 
     def refresh_settings(self) -> None:
         """Refresh cached merged settings from config entry data and options."""
@@ -264,6 +286,58 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.controller.async_apply_decision(data=data)
             data["last_control_action"] = self.controller.last_action
             data["last_error"] = self.last_error
+
+            # ── Overnight tracker update ──────────────────────────────
+            self.overnight_tracker.update(
+                now=now,
+                battery_soc_pct=battery_soc_pct,
+                grid_power_w=grid_power_w,
+            )
+
+            # ── Inverter schedule calculation + application ───────────
+            reserve_days = int(self._settings.get(CONF_OVERNIGHT_RESERVE_DAYS, 14))
+            reserve_margin = float(
+                self._settings.get(CONF_OVERNIGHT_RESERVE_MARGIN_PCT, 20.0)
+            )
+            fallback_reserve = int(
+                self._settings.get(CONF_OVERNIGHT_RESERVE_FALLBACK_PCT, 30)
+            )
+            overnight_reserve_pct = (
+                self.overnight_tracker.calculate_reserve_pct(
+                    margin_pct=reserve_margin,
+                    days=reserve_days,
+                )
+                or fallback_reserve
+            )
+
+            inverter_slots = calculate_inverter_schedule(
+                InverterScheduleInputs(overnight_reserve_pct=overnight_reserve_pct)
+            )
+            await self.inverter_controller.async_apply_schedule(inverter_slots)
+
+            now_time = now.timetz().replace(tzinfo=None)
+            active_slot_idx = current_slot_index(now_time, inverter_slots)
+
+            data.update(
+                {
+                    "overnight_avg_consumption_kwh": (
+                        self.overnight_tracker.average_overnight_consumption_kwh(
+                            reserve_days
+                        )
+                    ),
+                    "overnight_reserve_pct": overnight_reserve_pct,
+                    "overnight_snapshot_count": self.overnight_tracker.snapshot_count,
+                    "zerohero_import_kwh": round(
+                        self.overnight_tracker.zerohero_import_kwh, 4
+                    ),
+                    "super_export_kwh": round(
+                        self.overnight_tracker.super_export_kwh, 4
+                    ),
+                    "zerohero_eligible": self.overnight_tracker.zerohero_eligible,
+                    "current_inverter_slot": active_slot_idx + 1,
+                    "inverter_last_action": self.inverter_controller.last_action,
+                }
+            )
 
             _LOGGER.debug(
                 "Read grid=%sW, charger=%sW, base=%sW",

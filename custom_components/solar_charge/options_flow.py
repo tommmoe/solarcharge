@@ -13,6 +13,7 @@ from homeassistant.helpers import selector
 _LOGGER = logging.getLogger(__name__)
 
 from .const import (
+    CONF_BATTERY_CAPACITY_KWH,
     CONF_BATTERY_CHARGING_POSITIVE,
     CONF_BATTERY_POWER_ENTITY,
     CONF_BATTERY_POWER_MULTIPLIER,
@@ -49,6 +50,11 @@ from .const import (
     CONF_SAFETY_MARGIN_AMPS,
     CONF_SENSOR_STALE_SECONDS,
     CONF_START_DELAY_SECONDS,
+    CONF_DEYE_ENTITY_PREFIX,
+    CONF_INVERTER_CONTROL_ENABLED,
+    CONF_OVERNIGHT_RESERVE_DAYS,
+    CONF_OVERNIGHT_RESERVE_FALLBACK_PCT,
+    CONF_OVERNIGHT_RESERVE_MARGIN_PCT,
     CONF_STOP_DELAY_SECONDS,
     CONF_VOLTAGE,
     DEFAULTS,
@@ -170,6 +176,34 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required(CONF_CURRENT_CHANGE_THRESHOLD_AMPS, default=values[CONF_CURRENT_CHANGE_THRESHOLD_AMPS]): _number_selector(1, 20, 1),
                 vol.Required(CONF_CURRENT_UPDATE_MIN_INTERVAL_SECONDS, default=values[CONF_CURRENT_UPDATE_MIN_INTERVAL_SECONDS]): _number_selector(10, 3600, 5),
                 vol.Required(CONF_SENSOR_STALE_SECONDS, default=values[CONF_SENSOR_STALE_SECONDS]): _number_selector(10, 3600, 5),
+                # ── Inverter / Deye ──────────────────────────────────────────
+                vol.Optional(
+                    CONF_DEYE_ENTITY_PREFIX,
+                    default=str(values.get(CONF_DEYE_ENTITY_PREFIX) or ""),
+                ): selector.TextSelector(selector.TextSelectorConfig()),
+                vol.Required(
+                    CONF_INVERTER_CONTROL_ENABLED,
+                    default=bool(values.get(CONF_INVERTER_CONTROL_ENABLED, False)),
+                ): bool,
+                # ── Overnight reserve ────────────────────────────────────────
+                vol.Required(
+                    CONF_OVERNIGHT_RESERVE_MARGIN_PCT,
+                    default=_number_default(
+                        values.get(CONF_OVERNIGHT_RESERVE_MARGIN_PCT), 20.0
+                    ),
+                ): _number_selector(0, 50, 1),
+                vol.Required(
+                    CONF_OVERNIGHT_RESERVE_DAYS,
+                    default=_number_default(
+                        values.get(CONF_OVERNIGHT_RESERVE_DAYS), 14
+                    ),
+                ): _number_selector(2, 30, 1),
+                vol.Required(
+                    CONF_OVERNIGHT_RESERVE_FALLBACK_PCT,
+                    default=_number_default(
+                        values.get(CONF_OVERNIGHT_RESERVE_FALLBACK_PCT), 30
+                    ),
+                ): _number_selector(10, 60, 1),
             }
         )
 

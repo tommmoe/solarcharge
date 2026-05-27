@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_CONTROL_ENABLED, CONF_ENABLED, DOMAIN
+from .const import CONF_CONTROL_ENABLED, CONF_ENABLED, CONF_INVERTER_CONTROL_ENABLED, DOMAIN
 from .coordinator import SolarChargeCoordinator
 
 
@@ -31,6 +31,11 @@ SWITCHES: tuple[SolarChargeSwitchDescription, ...] = (
         key="control_enabled",
         translation_key="control_enabled",
         config_key=CONF_CONTROL_ENABLED,
+    ),
+    SolarChargeSwitchDescription(
+        key="inverter_control_enabled",
+        translation_key="inverter_control_enabled",
+        config_key=CONF_INVERTER_CONTROL_ENABLED,
     ),
 )
 
