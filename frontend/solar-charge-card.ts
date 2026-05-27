@@ -494,27 +494,27 @@ class SolarChargeCard extends HTMLElement {
   }
 
   private _batteryRing(soc: number, charging: boolean, discharging: boolean): string {
-    const r = 22;
+    const r = 26;
     const cx = 36, cy = 36;
     const circ = 2 * Math.PI * r;
     const filled = (soc / 100) * circ;
-    const color = soc > 60 ? "#22c55e" : soc > 25 ? "#f59e0b" : "#ef4444";
+    // Arc colour encodes state: blue=charging, amber=discharging, green/amber/red=idle by SOC
+    const arcColor = charging   ? "#3b82f6"
+                   : discharging ? "#f59e0b"
+                   : soc > 50   ? "#22c55e"
+                   : soc > 20   ? "#f59e0b"
+                   :               "#ef4444";
 
     return `
     <svg class="bat-ring" viewBox="0 0 72 72">
-      <!-- Background track -->
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-        stroke="var(--divider-color,rgba(127,127,127,0.2))" stroke-width="5"/>
-      <!-- SOC arc — starts at top (−90°) -->
+        stroke="var(--divider-color,rgba(127,127,127,0.18))" stroke-width="6"/>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-        stroke="${color}" stroke-width="5" stroke-linecap="round"
-        stroke-dasharray="${filled} ${circ}"
+        stroke="${arcColor}" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}"
         transform="rotate(-90 ${cx} ${cy})"/>
-      <!-- SOC text -->
-      <text x="${cx}" y="${cy + 5}" text-anchor="middle"
-        font-size="13" font-weight="700" fill="${color}" stroke="none">${Math.round(soc)}%</text>
-      ${charging ? `<text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="8" fill="#3b82f6" stroke="none">▲ CHG</text>` :
-        discharging ? `<text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="8" fill="#f59e0b" stroke="none">▼ DIS</text>` : ""}
+      <text x="${cx}" y="${cy + 6}" text-anchor="middle"
+        font-size="15" font-weight="700" fill="${arcColor}" stroke="none">${Math.round(soc)}%</text>
     </svg>`;
   }
 

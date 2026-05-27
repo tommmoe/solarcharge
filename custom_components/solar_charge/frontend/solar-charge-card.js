@@ -14,7 +14,7 @@ function C(t) {
 function b(t) {
   return (t == null ? void 0 : t.state) === "on";
 }
-function d(t) {
+function c(t) {
   const r = Number(t == null ? void 0 : t.state);
   if (!t || !Number.isFinite(r)) return "-";
   const e = String(t.attributes.unit_of_measurement ?? "W").toLowerCase() === "kw" ? r * 1e3 : r;
@@ -27,7 +27,7 @@ function L(t) {
   const r = Number(t == null ? void 0 : t.state);
   return !t || !Number.isFinite(r) ? "-" : `${Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r).toString() : r.toFixed(1)} A`;
 }
-function M(t) {
+function E(t) {
   const r = Number(t == null ? void 0 : t.state);
   return !t || !Number.isFinite(r) ? "-" : `${Math.round(r)}%`;
 }
@@ -58,7 +58,7 @@ const P = {
   overnightReservePct: ["sensor", "overnight_reserve_pct"],
   mode: ["select", "mode"],
   controlEnabled: ["switch", "control_enabled"]
-}, F = [
+}, M = [
   { label: "Off", option: "Off" },
   { label: "Solar", option: "Solar only" },
   { label: "Free", option: "Free hours only" },
@@ -73,7 +73,7 @@ const P = {
   { start: 21, end: 23, label: "Peak", color: "#b45309", cost: "57.2c" },
   { start: 23, end: 24, label: "Shoulder", color: "#4b5563", cost: "46.2c" }
 ];
-function E(t) {
+function I(t) {
   return k.find((r) => t >= r.start && t < r.end) ?? k[0];
 }
 class O extends HTMLElement {
@@ -133,7 +133,7 @@ class O extends HTMLElement {
   }
   _render() {
     if (!this.shadowRoot || !this._config) return;
-    const r = this._ent(), o = C(this._s(r.status)), e = b(this._s(r.allowedToCharge)), a = b(this._s(r.controlEnabled)), s = b(this._s(r.gridSensorOk)) && b(this._s(r.chargerSensorOk)) && b(this._s(r.breakerLimitOk)), i = C(this._s(r.mode)), p = C(this._s(r.chargerStatus)), n = this._carConnected(p), x = this._config.show_controls !== !1, h = s ? e ? "active" : "idle" : "danger", l = /* @__PURE__ */ new Date(), g = l.getHours() + l.getMinutes() / 60, c = E(g), u = g >= 18 && g < 21, w = u && b(this._s(r.zeroheroEligible));
+    const r = this._ent(), o = C(this._s(r.status)), e = b(this._s(r.allowedToCharge)), a = b(this._s(r.controlEnabled)), s = b(this._s(r.gridSensorOk)) && b(this._s(r.chargerSensorOk)) && b(this._s(r.breakerLimitOk)), i = C(this._s(r.mode)), p = C(this._s(r.chargerStatus)), n = this._carConnected(p), x = this._config.show_controls !== !1, h = s ? e ? "active" : "idle" : "danger", l = /* @__PURE__ */ new Date(), g = l.getHours() + l.getMinutes() / 60, d = I(g), u = g >= 18 && g < 21, w = u && b(this._s(r.zeroheroEligible));
     this.shadowRoot.innerHTML = `
       <style>${R}</style>
       <article class="card ${h}">
@@ -148,8 +148,8 @@ class O extends HTMLElement {
               <div class="zerohero-badge ${w ? "ok" : "risk"}">
                 ${w ? "✓" : "⚠"} ZeroHero
               </div>` : ""}
-            <div class="period-badge" style="background:${c.color}20;color:${c.color};border-color:${c.color}40">
-              ${f(c.label)} · ${f(c.cost)}
+            <div class="period-badge" style="background:${d.color}20;color:${d.color};border-color:${d.color}40">
+              ${f(d.label)} · ${f(d.cost)}
             </div>
             <div class="status-pill ${h}">
               <span></span>${e ? "Charging" : s ? "Waiting" : "Check"}
@@ -169,12 +169,12 @@ class O extends HTMLElement {
         </section>
 
         <section class="metrics-grid">
-          ${this._metric("Base import", d(this._s(r.baseGridImport)), "excl. EV")}
-          ${this._metric("Safe limit", d(this._s(r.safeImportLimit)), "breaker")}
-          ${this._metric("Spare", d(this._s(r.spareCapacity)), "headroom")}
+          ${this._metric("Base import", c(this._s(r.baseGridImport)), "excl. EV")}
+          ${this._metric("Safe limit", c(this._s(r.safeImportLimit)), "breaker")}
+          ${this._metric("Spare", c(this._s(r.spareCapacity)), "headroom")}
           ${this._metric("Target", L(this._s(r.targetAmps)), "calc. limit")}
           ${this._metric("Actual", L(this._s(r.actualCurrent)), "charger")}
-          ${this._metric("Reserve", M(this._s(r.overnightReservePct)), "overnight")}
+          ${this._metric("Reserve", E(this._s(r.overnightReservePct)), "overnight")}
         </section>
 
         <section class="reason-row">
@@ -192,7 +192,7 @@ class O extends HTMLElement {
         ${x ? `
           <section class="controls-row">
             <div class="mode-buttons">
-              ${F.map((m) => `
+              ${M.map((m) => `
                 <button class="${i === m.option ? "sel" : ""}"
                   data-action="mode" data-option="${m.option}" type="button">
                   ${m.label}
@@ -208,7 +208,7 @@ class O extends HTMLElement {
   }
   // ── Power flow diagram ────────────────────────────────────────────────
   _renderFlow(r) {
-    const o = v(this._s(r.pvPower)), e = v(this._s(r.gridImport)), a = v(this._s(r.batteryPower)), s = v(this._s(r.chargerPower)), i = v(this._s(r.loadPower)), p = v(this._s(r.batterySoc)), n = o > 50, x = e > 50, h = e < -50, l = a > 50, g = a < -50, c = s > 50, u = i > 50, w = "#f59e0b", m = h ? "#22c55e" : "#ef4444", y = l ? "#3b82f6" : g ? "#f59e0b" : "#6b7280", _ = "#a855f7", $ = "#64748b";
+    const o = v(this._s(r.pvPower)), e = v(this._s(r.gridImport)), a = v(this._s(r.batteryPower)), s = v(this._s(r.chargerPower)), i = v(this._s(r.loadPower)), p = v(this._s(r.batterySoc)), n = o > 50, x = e > 50, h = e < -50, l = a > 50, g = a < -50, d = s > 50, u = i > 50, w = "#f59e0b", m = h ? "#22c55e" : "#ef4444", y = l ? "#3b82f6" : g ? "#f59e0b" : "#6b7280", _ = "#a855f7", $ = "#64748b";
     return `
     <div class="flow-wrap">
       <!-- SVG layer for paths -->
@@ -217,7 +217,7 @@ class O extends HTMLElement {
           ${this._gradDef("g-pv", "#f59e0b", n)}
           ${this._gradDef("g-grid", m, x || h)}
           ${this._gradDef("g-bat", y, l || g)}
-          ${this._gradDef("g-ev", _, c)}
+          ${this._gradDef("g-ev", _, d)}
           ${this._gradDef("g-load", $, u)}
         </defs>
 
@@ -228,7 +228,7 @@ class O extends HTMLElement {
       w,
       "g-pv",
       "0 → 1",
-      d(this._s(r.pvPower))
+      c(this._s(r.pvPower))
     )}
 
         <!-- Grid → Home  /  Home → Grid -->
@@ -238,7 +238,7 @@ class O extends HTMLElement {
       m,
       "g-grid",
       "1 → 0",
-      x ? d(this._s(r.gridImport)) : ""
+      x ? c(this._s(r.gridImport)) : ""
     )}
         ${this._flowPath(
       "M 180 130 C 180 55 288 130 288 55",
@@ -246,7 +246,7 @@ class O extends HTMLElement {
       "#22c55e",
       "g-grid",
       "0 → 1",
-      h ? d(this._s(r.gridImport)) : ""
+      h ? c(this._s(r.gridImport)) : ""
     )}
 
         <!-- Home → Battery  /  Battery → Home -->
@@ -256,7 +256,7 @@ class O extends HTMLElement {
       y,
       "g-bat",
       "0 → 1",
-      l ? d(this._s(r.batteryPower)) : ""
+      l ? c(this._s(r.batteryPower)) : ""
     )}
         ${this._flowPath(
       "M 60 210 C 60 130 180 210 180 130",
@@ -264,17 +264,17 @@ class O extends HTMLElement {
       y,
       "g-bat",
       "0 → 1",
-      g ? d(this._s(r.batteryPower)) : ""
+      g ? c(this._s(r.batteryPower)) : ""
     )}
 
         <!-- Home → EV -->
         ${this._flowPath(
       "M 180 130 L 180 210",
-      c,
+      d,
       _,
       "g-ev",
       "0 → 1",
-      c ? d(this._s(r.chargerPower)) : ""
+      d ? c(this._s(r.chargerPower)) : ""
     )}
 
         <!-- Home → Load -->
@@ -284,20 +284,20 @@ class O extends HTMLElement {
       $,
       "g-load",
       "0 → 1",
-      u ? d(this._s(r.loadPower)) : ""
+      u ? c(this._s(r.loadPower)) : ""
     )}
       </svg>
 
       <!-- Nodes -->
       <div class="node solar ${n ? "on" : ""}" style="--nc:${w}">
         ${this._solarIcon()}
-        <div class="nval">${d(this._s(r.pvPower))}</div>
+        <div class="nval">${c(this._s(r.pvPower))}</div>
         <div class="nlbl">Solar</div>
       </div>
 
       <div class="node grid ${x ? "on" : h ? "exp" : ""}" style="--nc:${m}">
         ${this._gridIcon()}
-        <div class="nval">${d(this._s(r.gridImport))}</div>
+        <div class="nval">${c(this._s(r.gridImport))}</div>
         <div class="nlbl">${h ? "Exporting" : "Grid"}</div>
       </div>
 
@@ -307,19 +307,19 @@ class O extends HTMLElement {
 
       <div class="node battery ${l ? "chg" : g ? "dis" : ""}" style="--nc:${y}">
         ${this._batteryRing(p, l, g)}
-        <div class="nval">${d(this._s(r.batteryPower))}</div>
+        <div class="nval">${c(this._s(r.batteryPower))}</div>
         <div class="nlbl">Battery</div>
       </div>
 
-      <div class="node ev ${c ? "on" : ""}" style="--nc:${_}">
-        ${this._evIcon(c)}
-        <div class="nval">${d(this._s(r.chargerPower))}</div>
+      <div class="node ev ${d ? "on" : ""}" style="--nc:${_}">
+        ${this._evIcon(d)}
+        <div class="nval">${c(this._s(r.chargerPower))}</div>
         <div class="nlbl">EV</div>
       </div>
 
       <div class="node house-load ${u ? "on" : ""}" style="--nc:${$}">
         ${this._loadIcon()}
-        <div class="nval">${d(this._s(r.loadPower))}</div>
+        <div class="nval">${c(this._s(r.loadPower))}</div>
         <div class="nlbl">Load</div>
       </div>
     </div>`;
@@ -397,21 +397,17 @@ class O extends HTMLElement {
     </svg>`;
   }
   _batteryRing(r, o, e) {
-    const p = 2 * Math.PI * 22, n = r / 100 * p, x = r > 60 ? "#22c55e" : r > 25 ? "#f59e0b" : "#ef4444";
+    const p = 2 * Math.PI * 26, n = r / 100 * p, x = o ? "#3b82f6" : e ? "#f59e0b" : r > 50 ? "#22c55e" : r > 20 ? "#f59e0b" : "#ef4444";
     return `
     <svg class="bat-ring" viewBox="0 0 72 72">
-      <!-- Background track -->
-      <circle cx="36" cy="36" r="22" fill="none"
-        stroke="var(--divider-color,rgba(127,127,127,0.2))" stroke-width="5"/>
-      <!-- SOC arc — starts at top (−90°) -->
-      <circle cx="36" cy="36" r="22" fill="none"
-        stroke="${x}" stroke-width="5" stroke-linecap="round"
-        stroke-dasharray="${n} ${p}"
+      <circle cx="36" cy="36" r="26" fill="none"
+        stroke="var(--divider-color,rgba(127,127,127,0.18))" stroke-width="6"/>
+      <circle cx="36" cy="36" r="26" fill="none"
+        stroke="${x}" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${n.toFixed(1)} ${p.toFixed(1)}"
         transform="rotate(-90 36 36)"/>
-      <!-- SOC text -->
-      <text x="36" y="41" text-anchor="middle"
-        font-size="13" font-weight="700" fill="${x}" stroke="none">${Math.round(r)}%</text>
-      ${o ? '<text x="36" y="54" text-anchor="middle" font-size="8" fill="#3b82f6" stroke="none">▲ CHG</text>' : e ? '<text x="36" y="54" text-anchor="middle" font-size="8" fill="#f59e0b" stroke="none">▼ DIS</text>' : ""}
+      <text x="36" y="42" text-anchor="middle"
+        font-size="15" font-weight="700" fill="${x}" stroke="none">${Math.round(r)}%</text>
     </svg>`;
   }
   _evIcon(r) {
@@ -445,7 +441,7 @@ class O extends HTMLElement {
     return !["available", "unavailable", "disconnected", "not connected", "idle", "ready"].includes(o);
   }
 }
-const I = {
+const F = {
   status: ["sensor", "status"],
   zeroheroEligible: ["binary_sensor", "zerohero_eligible"],
   zeroheroImportKwh: ["sensor", "zerohero_import_kwh"],
@@ -480,8 +476,8 @@ class H extends HTMLElement {
   _ent() {
     var a, s;
     const r = ((a = this._config) == null ? void 0 : a.entities) ?? {}, o = this._baseId(), e = {};
-    for (const i of Object.keys(I)) {
-      const [p, n] = I[i];
+    for (const i of Object.keys(F)) {
+      const [p, n] = F[i];
       e[i] = r[i] ?? (o ? `${p}.${o}_${n}` : void 0);
     }
     return (s = this._config) != null && s.entity && (e.status = r.status ?? this._config.entity), e;
@@ -493,7 +489,7 @@ class H extends HTMLElement {
   _render() {
     var _, $;
     if (!this.shadowRoot || !this._config) return;
-    const r = this._ent(), o = /* @__PURE__ */ new Date(), e = o.getHours() + o.getMinutes() / 60, a = E(e), s = this._config.battery_capacity_kwh ?? 48, i = b(this._s(r.zeroheroEligible)), p = v(this._s(r.zeroheroImportKwh)), n = v(this._s(r.superExportKwh)), x = v(this._s(r.overnightAvgConsumption)) || null, h = v(this._s(r.overnightReservePct)), l = v(this._s(r.overnightSnapshotCount)), g = v(this._s(r.currentInverterSlot)) || 0, c = v(this._s(r.batterySoc)), u = e >= 18 && e < 21, w = ((_ = k.find((S) => S.start > e)) == null ? void 0 : _.start) ?? k[0].start + 24, m = Math.round((w - e) * 60), y = (($ = k.find((S) => S.start === w % 24)) == null ? void 0 : $.label) ?? "";
+    const r = this._ent(), o = /* @__PURE__ */ new Date(), e = o.getHours() + o.getMinutes() / 60, a = I(e), s = this._config.battery_capacity_kwh ?? 48, i = b(this._s(r.zeroheroEligible)), p = v(this._s(r.zeroheroImportKwh)), n = v(this._s(r.superExportKwh)), x = v(this._s(r.overnightAvgConsumption)) || null, h = v(this._s(r.overnightReservePct)), l = v(this._s(r.overnightSnapshotCount)), g = v(this._s(r.currentInverterSlot)) || 0, d = v(this._s(r.batterySoc)), u = e >= 18 && e < 21, w = ((_ = k.find((S) => S.start > e)) == null ? void 0 : _.start) ?? k[0].start + 24, m = Math.round((w - e) * 60), y = (($ = k.find((S) => S.start === w % 24)) == null ? void 0 : $.label) ?? "";
     this.shadowRoot.innerHTML = `
       <style>${W}</style>
       <article class="card">
@@ -565,9 +561,9 @@ class H extends HTMLElement {
               <span class="ov-sub">≈ ${h ? z(h / 100 * s) : "—"}</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${c ? Math.round(c) + "%" : "—"}</span>
+              <span class="ov-val">${d ? Math.round(d) + "%" : "—"}</span>
               <span class="ov-lbl">Current SOC</span>
-              <span class="ov-sub">≈ ${z(c / 100 * s)}</span>
+              <span class="ov-sub">≈ ${z(d / 100 * s)}</span>
             </div>
             <div class="ov-stat">
               <span class="ov-val">${g ? `Slot ${g}` : "—"}</span>
