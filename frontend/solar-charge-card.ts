@@ -176,7 +176,7 @@ const FLOW_POS: Record<FlowNodeKey, [number, number]> = {
 // true visual radius of each node circle (+ small gap) so a connector stops
 // just outside it. Battery is smaller: its SOC ring sits inside padding.
 const FLOW_RAD: Record<FlowNodeKey, number> = {
-  solar: 26, grid: 26, ev: 26, load: 26, home: 32, battery: 25,
+  solar: 26, grid: 26, ev: 26, load: 26, home: 28, battery: 25,
 };
 
 // Straight connector trimmed along its own direction by each node's radius,
@@ -905,7 +905,7 @@ p  { margin: 4px 0 0; font-size: 0.88rem; color: var(--secondary-text-color, #66
     color-mix(in srgb, var(--primary-color,#1d6f9f) 8%, transparent), transparent 70%);
 }
 .flow-wrap {
-  position: relative; width: 100%; max-width: 460px; margin: 0 auto;
+  position: relative; width: 100%; max-width: 420px; margin: 0 auto;
   aspect-ratio: 360 / 300; container-type: inline-size;
 }
 .flow-svg {
@@ -937,18 +937,18 @@ p  { margin: 4px 0 0; font-size: 0.88rem; color: var(--secondary-text-color, #66
   color: var(--secondary-text-color, #6b7280);
   transition: border-color .35s, color .35s, box-shadow .35s, background .35s;
 }
-.home-icon { width: 16.5cqw; height: 16.5cqw; padding: 3.3cqw; border-width: 2.5px; }
+.home-icon { width: 14.5cqw; height: 14.5cqw; padding: 3cqw; border-width: 2px; }
 
 .node.on .nicon {
   border-color: var(--nc); color: var(--nc);
   background: color-mix(in srgb, var(--nc) 14%, var(--card-background-color,#fff));
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--nc) 13%, transparent),
-              0 0 16px color-mix(in srgb, var(--nc) 38%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--nc) 12%, transparent),
+              0 0 14px color-mix(in srgb, var(--nc) 32%, transparent);
 }
 .node.home .nicon {
   border-color: var(--primary-color,#1d6f9f); color: var(--primary-color,#1d6f9f);
-  background: color-mix(in srgb, var(--primary-color,#1d6f9f) 12%, var(--card-background-color,#fff));
-  box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary-color,#1d6f9f) 12%, transparent);
+  background: color-mix(in srgb, var(--primary-color,#1d6f9f) 10%, var(--card-background-color,#fff));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color,#1d6f9f) 11%, transparent);
 }
 
 .bat-ring { display: block; width: 16.5cqw; height: 16.5cqw; }
