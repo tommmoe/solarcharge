@@ -166,6 +166,34 @@ function currentPeriod(hour: number): TariffPeriod {
   return TARIFF_PERIODS.find(p => hour >= p.start && hour < p.end) ?? TARIFF_PERIODS[0];
 }
 
+// ── Power-flow diagram geometry (SVG viewBox 0 0 360 300) ──────────────────
+type FlowNodeKey = "solar" | "grid" | "home" | "battery" | "ev" | "load";
+
+const FLOW_POS: Record<FlowNodeKey, [number, number]> = {
+  solar: [104, 52], grid: [256, 52], home: [180, 150],
+  battery: [70, 244], ev: [180, 244], load: [290, 244],
+};
+// true visual radius of each node circle (+ small gap) so a connector stops
+// just outside it. Battery is smaller: its SOC ring sits inside padding.
+const FLOW_RAD: Record<FlowNodeKey, number> = {
+  solar: 26, grid: 26, ev: 26, load: 26, home: 32, battery: 25,
+};
+
+// Straight connector trimmed along its own direction by each node's radius,
+// with a slight outward bow so it reads as a wire, not a stark spoke.
+function flowPath(from: FlowNodeKey, to: FlowNodeKey): string {
+  const a = FLOW_POS[from], b = FLOW_POS[to];
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const sx = a[0] + ux * FLOW_RAD[from], sy = a[1] + uy * FLOW_RAD[from];
+  const ex = b[0] - ux * FLOW_RAD[to],   ey = b[1] - uy * FLOW_RAD[to];
+  const mx = (sx + ex) / 2, my = (sy + ey) / 2;
+  const bow = len * 0.05 * (mx < 180 ? -1 : mx > 180 ? 1 : 0);
+  const cx = mx + (-uy) * bow, cy = my + ux * bow;
+  return `M ${sx.toFixed(1)} ${sy.toFixed(1)} Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}`;
+}
+
 class SolarChargeCard extends HTMLElement {
   private _hass?: HomeAssistant;
   private _config?: FlowCardConfig;
@@ -385,7 +413,7 @@ class SolarChargeCard extends HTMLElement {
     const evOn    = evPwr > 50;
     const loadOn  = load > 50;
 
-    // Arc colours
+    // Node / flow colours
     const pvCol   = "#f59e0b";
     const gridCol = gridExp ? "#22c55e" : "#ef4444";
     const batCol  = batChg ? "#3b82f6" : batDis ? "#f59e0b" : "#6b7280";
@@ -394,103 +422,65 @@ class SolarChargeCard extends HTMLElement {
 
     return `
     <div class="flow-wrap">
-      <!-- SVG layer for paths -->
-      <svg class="flow-svg" viewBox="0 0 360 260" preserveAspectRatio="xMidYMid meet">
+      <svg class="flow-svg" viewBox="0 0 360 300" preserveAspectRatio="xMidYMid meet">
         <defs>
-          ${this._gradDef("g-pv",   "#f59e0b", pvOn)}
-          ${this._gradDef("g-grid", gridCol,   gridImp || gridExp)}
-          ${this._gradDef("g-bat",  batCol,    batChg || batDis)}
-          ${this._gradDef("g-ev",   evCol,     evOn)}
-          ${this._gradDef("g-load", loadCol,   loadOn)}
+          <filter id="sc-glow" x="-60%" y="-60%" width="220%" height="220%">
+            <feGaussianBlur stdDeviation="2.2" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
         </defs>
-
-        <!-- Solar → Home -->
-        ${this._flowPath("M 72 55 C 72 130 180 55 180 130",
-          pvOn, pvCol, "g-pv", "0 → 1", fmtPower(this._s(ent.pvPower)))}
-
-        <!-- Grid → Home  /  Home → Grid -->
-        ${this._flowPath("M 288 55 C 288 130 180 55 180 130",
-          gridImp, gridCol, "g-grid", "1 → 0", gridImp ? fmtPower(this._s(ent.gridImport)) : "")}
-        ${this._flowPath("M 180 130 C 180 55 288 130 288 55",
-          gridExp, "#22c55e", "g-grid", "0 → 1", gridExp ? fmtPower(this._s(ent.gridImport)) : "")}
-
-        <!-- Home → Battery  /  Battery → Home -->
-        ${this._flowPath("M 180 130 C 180 210 60 130 60 210",
-          batChg, batCol, "g-bat", "0 → 1", batChg ? fmtPower(this._s(ent.batteryPower)) : "")}
-        ${this._flowPath("M 60 210 C 60 130 180 210 180 130",
-          batDis, batCol, "g-bat", "0 → 1", batDis ? fmtPower(this._s(ent.batteryPower)) : "")}
-
-        <!-- Home → EV -->
-        ${this._flowPath("M 180 130 L 180 210",
-          evOn, evCol, "g-ev", "0 → 1", evOn ? fmtPower(this._s(ent.chargerPower)) : "")}
-
-        <!-- Home → Load -->
-        ${this._flowPath("M 180 130 C 180 210 300 130 300 210",
-          loadOn, loadCol, "g-load", "0 → 1", loadOn ? fmtPower(this._s(ent.loadPower)) : "")}
+        ${this._flowEdge("solar",  "home",    pvOn,             pvCol,   false)}
+        ${this._flowEdge("grid",   "home",    gridImp||gridExp, gridCol, gridExp)}
+        ${this._flowEdge("home",   "battery", batChg||batDis,   batCol,  batDis)}
+        ${this._flowEdge("home",   "ev",      evOn,             evCol,   false)}
+        ${this._flowEdge("home",   "load",    loadOn,           loadCol, false)}
       </svg>
 
-      <!-- Nodes -->
       <div class="node solar ${pvOn ? "on" : ""}" style="--nc:${pvCol}">
         ${this._solarIcon()}
-        <div class="nval">${fmtPower(this._s(ent.pvPower))}</div>
-        <div class="nlbl">Solar</div>
+        <div class="ntext"><div class="nval">${fmtPower(this._s(ent.pvPower))}</div><div class="nlbl">Solar</div></div>
       </div>
 
-      <div class="node grid ${gridImp ? "on" : gridExp ? "exp" : ""}" style="--nc:${gridCol}">
+      <div class="node grid ${gridImp || gridExp ? "on" : ""}" style="--nc:${gridCol}">
         ${this._gridIcon()}
-        <div class="nval">${fmtPower(this._s(ent.gridImport))}</div>
-        <div class="nlbl">${gridExp ? "Exporting" : "Grid"}</div>
+        <div class="ntext"><div class="nval">${fmtPower(this._s(ent.gridImport))}</div><div class="nlbl">${gridExp ? "Export" : "Grid"}</div></div>
       </div>
 
       <div class="node home" style="--nc:var(--primary-color,#1d6f9f)">
         ${this._homeIcon()}
       </div>
 
-      <div class="node battery ${batChg ? "chg" : batDis ? "dis" : ""}" style="--nc:${batCol}">
+      <div class="node battery ${batChg || batDis ? "on" : ""}" style="--nc:${batCol}">
         ${this._batteryRing(soc, batChg, batDis)}
-        <div class="nval">${fmtPower(this._s(ent.batteryPower))}</div>
-        <div class="nlbl">Battery</div>
+        <div class="ntext"><div class="nval">${fmtPower(this._s(ent.batteryPower))}</div><div class="nlbl">Battery</div></div>
       </div>
 
       <div class="node ev ${evOn ? "on" : ""}" style="--nc:${evCol}">
         ${this._evIcon(evOn)}
-        <div class="nval">${fmtPower(this._s(ent.chargerPower))}</div>
-        <div class="nlbl">EV</div>
+        <div class="ntext"><div class="nval">${fmtPower(this._s(ent.chargerPower))}</div><div class="nlbl">EV</div></div>
       </div>
 
-      <div class="node house-load ${loadOn ? "on" : ""}" style="--nc:${loadCol}">
+      <div class="node load ${loadOn ? "on" : ""}" style="--nc:${loadCol}">
         ${this._loadIcon()}
-        <div class="nval">${fmtPower(this._s(ent.loadPower))}</div>
-        <div class="nlbl">Load</div>
+        <div class="ntext"><div class="nval">${fmtPower(this._s(ent.loadPower))}</div><div class="nlbl">Load</div></div>
       </div>
     </div>`;
   }
 
-  private _gradDef(id: string, color: string, active: boolean): string {
-    if (!active) return "";
-    return `<linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${color}" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="${color}" stop-opacity="0.4"/>
-    </linearGradient>`;
-  }
-
-  private _flowPath(
-    d: string, active: boolean, color: string,
-    gradId: string, animDir: string, label: string
+  private _flowEdge(
+    from: FlowNodeKey, to: FlowNodeKey,
+    active: boolean, color: string, reverse: boolean,
   ): string {
+    const d = flowPath(from, to);
     if (!active) {
-      return `<path d="${d}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.2))" stroke-width="2"/>`;
+      return `<path d="${d}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.22))" stroke-width="2.5" stroke-linecap="round"/>`;
     }
-    const fromOffset = animDir === "0 → 1" ? "0" : "24";
-    const toOffset   = animDir === "0 → 1" ? "24" : "0";
+    const kp = reverse ? 'keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : "";
     return `
-      <path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-opacity="0.35" stroke-linecap="round"/>
-      <path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"
-        stroke-dasharray="6 10">
-        <animate attributeName="stroke-dashoffset"
-          from="${fromOffset}" to="${toOffset}" dur="1.2s" repeatCount="indefinite"/>
-      </path>
-      ${label ? `<title>${label}</title>` : ""}`;
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-opacity="0.5" stroke-linecap="round"/>
+      <circle class="flow-dot" r="3.8" fill="${color}" filter="url(#sc-glow)">
+        <animateMotion dur="2s" repeatCount="indefinite" path="${d}" ${kp}/>
+      </circle>`;
   }
 
   // ── EV 7-day history strip ────────────────────────────────────────────
@@ -530,99 +520,74 @@ class SolarChargeCard extends HTMLElement {
   // ── Node icons ────────────────────────────────────────────────────────
 
   private _solarIcon(): string {
-    return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="7" r="2.5"/>
-      <line x1="12" y1="2" x2="12" y2="3.5"/>
-      <line x1="17.5" y1="7" x2="16" y2="7"/>
-      <line x1="15.5" y1="3.5" x2="14.5" y2="4.5"/>
-      <line x1="15.5" y1="10.5" x2="14.5" y2="9.5"/>
-      <line x1="6.5" y1="7" x2="8" y2="7"/>
-      <line x1="8.5" y1="3.5" x2="9.5" y2="4.5"/>
-      <line x1="8.5" y1="10.5" x2="9.5" y2="9.5"/>
-      <rect x="7" y="11" width="10" height="5.5" rx="0.5"/>
-      <line x1="9.5" y1="11" x2="9.5" y2="16.5"/>
-      <line x1="12" y1="11" x2="12" y2="16.5"/>
-      <line x1="14.5" y1="11" x2="14.5" y2="16.5"/>
-      <line x1="7" y1="13.5" x2="17" y2="13.5"/>
-      <line x1="12" y1="16.5" x2="12" y2="19"/>
-      <line x1="9" y1="19" x2="15" y2="19"/>
-      <line x1="10" y1="19" x2="10" y2="21"/>
-      <line x1="14" y1="19" x2="14" y2="21"/>
-      <line x1="8" y1="21" x2="16" y2="21"/>
+    return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4.5" width="18" height="11" rx="1"/>
+      <line x1="3" y1="8.2" x2="21" y2="8.2"/><line x1="3" y1="11.8" x2="21" y2="11.8"/>
+      <line x1="9" y1="4.5" x2="9" y2="15.5"/><line x1="15" y1="4.5" x2="15" y2="15.5"/>
+      <line x1="12" y1="15.5" x2="12" y2="19"/><line x1="8.5" y1="20" x2="15.5" y2="20"/>
+      <line x1="12" y1="19" x2="12" y2="20"/>
     </svg>`;
   }
 
   private _gridIcon(): string {
-    return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="12" y1="2" x2="12" y2="22"/>
-      <line x1="5" y1="6" x2="19" y2="6"/>
-      <line x1="5" y1="6" x2="3" y2="8"/>
-      <line x1="19" y1="6" x2="21" y2="8"/>
-      <line x1="7" y1="11" x2="17" y2="11"/>
-      <line x1="7" y1="11" x2="5" y2="13"/>
-      <line x1="17" y1="11" x2="19" y2="13"/>
-      <line x1="8.5" y1="16" x2="15.5" y2="16"/>
-      <line x1="8.5" y1="16" x2="6.5" y2="18"/>
-      <line x1="15.5" y1="16" x2="17.5" y2="18"/>
-      <path d="M10 8 L12 6 L14 8"/>
-      <path d="M9.5 13 L12 11 L14.5 13"/>
-      <path d="M9 18 L12 16 L15 18"/>
+    return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="2.5" x2="6.5" y2="21.5"/><line x1="12" y1="2.5" x2="17.5" y2="21.5"/>
+      <line x1="9.4" y1="5" x2="14.6" y2="5"/>
+      <line x1="8.9" y1="9" x2="15.1" y2="9"/><line x1="8" y1="14" x2="16" y2="14"/>
+      <line x1="7.1" y1="19" x2="16.9" y2="19"/>
+      <path d="M8.9 9 L15.1 14"/><path d="M15.1 9 L8.9 14"/>
+      <path d="M8 14 L16.9 19"/><path d="M16 14 L7.1 19"/>
     </svg>`;
   }
 
   private _homeIcon(): string {
-    return `<svg class="nicon home-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 12 L12 3 L21 12"/>
-      <path d="M5 10 L5 20 C5 20.5 5.5 21 6 21 L18 21 C18.5 21 19 20.5 19 20 L19 10"/>
-      <path d="M9 21 L9 15 C9 14.5 9.5 14 10 14 L14 14 C14.5 14 15 14.5 15 15 L15 21"/>
+    return `<svg class="nicon home-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 11.5 L12 3.5 L21 11.5"/>
+      <path d="M5.2 9.8 V20 C5.2 20.5 5.6 20.8 6 20.8 H18 C18.4 20.8 18.8 20.5 18.8 20 V9.8"/>
+      <path d="M9.3 20.8 V15 C9.3 14.5 9.7 14.2 10.1 14.2 H13.9 C14.3 14.2 14.7 14.5 14.7 15 V20.8"/>
     </svg>`;
   }
 
   private _loadIcon(): string {
-    return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M3 12 L12 3 L21 12 L21 20 C21 20.5 20.5 21 20 21 L4 21 C3.5 21 3 20.5 3 20 Z"/>
-      <path d="M9 21 L9 16 C9 15.5 9.5 15 10 15 L14 15 C14.5 15 15 15.5 15 16 L15 21"/>
-      <circle cx="12" cy="11" r="2"/>
-      <line x1="12" y1="8" x2="12" y2="9"/>
-      <line x1="12" y1="13" x2="12" y2="14"/>
+    return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8.4 14.5 C7.9 13.6 7.3 13 6.6 12.3 A5.2 5.2 0 1 1 17.4 12.3 C16.7 13 16.1 13.6 15.6 14.5"/>
+      <line x1="9" y1="17.5" x2="15" y2="17.5"/><line x1="10" y1="20.5" x2="14" y2="20.5"/>
     </svg>`;
   }
 
   private _batteryRing(soc: number, charging: boolean, discharging: boolean): string {
-    const r = 26;
-    const cx = 36, cy = 36;
+    const r = 22, cx = 28, cy = 28;
     const circ = 2 * Math.PI * r;
     const filled = (soc / 100) * circ;
     // Arc colour encodes state: blue=charging, amber=discharging, green/amber/red=idle by SOC
-    const arcColor = charging   ? "#3b82f6"
+    const arcColor = charging    ? "#3b82f6"
                    : discharging ? "#f59e0b"
-                   : soc > 50   ? "#22c55e"
-                   : soc > 20   ? "#f59e0b"
+                   : soc > 50    ? "#22c55e"
+                   : soc > 20    ? "#f59e0b"
                    :               "#ef4444";
 
     return `
-    <svg class="bat-ring" viewBox="0 0 72 72">
+    <svg class="bat-ring" viewBox="0 0 56 56">
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-        stroke="var(--divider-color,rgba(127,127,127,0.18))" stroke-width="6"/>
+        stroke="var(--divider-color,rgba(127,127,127,0.18))" stroke-width="5"/>
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
-        stroke="${arcColor}" stroke-width="6" stroke-linecap="round"
+        stroke="${arcColor}" stroke-width="5" stroke-linecap="round"
         stroke-dasharray="${filled.toFixed(1)} ${circ.toFixed(1)}"
         transform="rotate(-90 ${cx} ${cy})"/>
-      <text x="${cx}" y="${cy + 6}" text-anchor="middle"
-        font-size="15" font-weight="700" fill="${arcColor}" stroke="none">${Math.round(soc)}%</text>
+      <text x="${cx}" y="${cy + 5}" text-anchor="middle"
+        font-size="15" font-weight="700" fill="${arcColor}" stroke="none">${Math.round(soc)}</text>
     </svg>`;
   }
 
   private _evIcon(active: boolean): string {
+    const bolt = active
+      ? `<path d="M12.4 10.3 L10.6 13 L12.2 13 L11.2 15.4" fill="none" stroke="#a855f7" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`
+      : "";
     return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3" y="9" width="18" height="10" rx="2"/>
-      <path d="M7 9 L7 6 C7 5.5 7.5 5 8 5 L16 5 C16.5 5 17 5.5 17 6 L17 9"/>
-      <rect x="5" y="11" width="5" height="3" rx="0.5"/>
-      <rect x="14" y="11" width="5" height="3" rx="0.5"/>
-      <line x1="12" y1="11" x2="12" y2="14"/>
-      ${active ? `<path d="M11.5 5.5 L10 8 L11.5 8 L10 11" fill="none" stroke="#a855f7" stroke-width="1.5"/>` : ""}
-      <line x1="7" y1="19" x2="7" y2="21"/>
-      <line x1="17" y1="19" x2="17" y2="21"/>
+      <path d="M5 16.5 H3.4 C2.9 16.5 2.5 16.1 2.5 15.6 V13.2 C2.5 12.8 2.6 12.4 2.8 12 L4 9.6 C4.3 9.1 4.8 8.8 5.3 8.8 H13 C13.6 8.8 14.1 9 14.5 9.4 L16.8 11.6 C17 11.8 17.3 11.9 17.6 12 L19.8 12.5 C20.5 12.7 21 13.3 21 14 V15.6 C21 16.1 20.6 16.5 20.1 16.5 H18.6"/>
+      <circle cx="7.4" cy="16.6" r="1.9"/><circle cx="16.2" cy="16.6" r="1.9"/>
+      <line x1="9.3" y1="16.6" x2="14.3" y2="16.6"/>
+      ${bolt}
     </svg>`;
   }
 
@@ -935,50 +900,61 @@ p  { margin: 4px 0 0; font-size: 0.88rem; color: var(--secondary-text-color, #66
 
 /* Power flow diagram */
 .flow-section {
-  padding: 8px 12px 12px;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--primary-background-color,#f7f8fa) 60%, transparent), transparent);
+  padding: 10px 12px 14px;
+  background: radial-gradient(120% 80% at 50% 50%,
+    color-mix(in srgb, var(--primary-color,#1d6f9f) 8%, transparent), transparent 70%);
 }
 .flow-wrap {
   position: relative; width: 100%; max-width: 460px; margin: 0 auto;
-  aspect-ratio: 360 / 260;
+  aspect-ratio: 360 / 300; container-type: inline-size;
 }
 .flow-svg {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 0;
 }
 
-/* Nodes */
-.node {
-  position: absolute; display: flex; flex-direction: column;
-  align-items: center; gap: 4px; z-index: 1;
+/* Nodes — anchored on the icon centre so text never shifts the icon off the
+   point the connector line targets. Positions mirror FLOW_POS / [360,300]. */
+.node { position: absolute; z-index: 1; transform: translate(-50%,-50%); line-height: 0; }
+.node.solar   { left: 28.9%; top: 17.3%; }
+.node.grid    { left: 71.1%; top: 17.3%; }
+.node.home    { left: 50%;   top: 50%; }
+.node.battery { left: 19.4%; top: 81.3%; }
+.node.ev      { left: 50%;   top: 81.3%; }
+.node.load    { left: 80.6%; top: 81.3%; }
+
+.ntext {
+  position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  white-space: nowrap; line-height: 1.15;
 }
-.node.solar    { top: 0%;   left: 12%; transform: translateX(-50%); }
-.node.grid     { top: 0%;   right: 2%; transform: translateX(-50%); }
-.node.home     { top: 34%;  left: 50%; transform: translate(-50%,-50%); }
-.node.battery  { bottom: 0; left: 10%; transform: translateX(-50%); }
-.node.ev       { bottom: 0; left: 50%; transform: translateX(-50%); }
-.node.house-load { bottom: 0; right: 2%; transform: translateX(-50%); }
 
 .nicon {
-  width: 44px; height: 44px; padding: 9px;
+  display: block; width: 13.5cqw; height: 13.5cqw; padding: 2.7cqw;
   border-radius: 50%;
   background: var(--card-background-color, #fff);
-  border: 2.5px solid var(--divider-color, rgba(127,127,127,.25));
+  border: 2px solid var(--divider-color, rgba(127,127,127,.25));
   color: var(--secondary-text-color, #6b7280);
-  transition: border-color .3s, color .3s, box-shadow .3s;
+  transition: border-color .35s, color .35s, box-shadow .35s, background .35s;
 }
-.home-icon { width: 52px; height: 52px; padding: 10px; border-width: 3px; }
+.home-icon { width: 16.5cqw; height: 16.5cqw; padding: 3.3cqw; border-width: 2.5px; }
 
-.node.on  .nicon,
-.node.chg .nicon { border-color: var(--nc); color: var(--nc); background: color-mix(in srgb, var(--nc) 10%, var(--card-background-color,#fff)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--nc) 15%, transparent); }
-.node.dis .nicon { border-color: var(--nc); color: var(--nc); background: color-mix(in srgb, var(--nc) 10%, var(--card-background-color,#fff)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--nc) 15%, transparent); }
-.node.exp .nicon { border-color: #22c55e; color: #22c55e; background: rgba(34,197,94,.08); box-shadow: 0 0 0 4px rgba(34,197,94,.15); }
-.node.home .nicon { border-color: var(--primary-color,#1d6f9f); color: var(--primary-color,#1d6f9f); }
+.node.on .nicon {
+  border-color: var(--nc); color: var(--nc);
+  background: color-mix(in srgb, var(--nc) 14%, var(--card-background-color,#fff));
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--nc) 13%, transparent),
+              0 0 16px color-mix(in srgb, var(--nc) 38%, transparent);
+}
+.node.home .nicon {
+  border-color: var(--primary-color,#1d6f9f); color: var(--primary-color,#1d6f9f);
+  background: color-mix(in srgb, var(--primary-color,#1d6f9f) 12%, var(--card-background-color,#fff));
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary-color,#1d6f9f) 12%, transparent);
+}
 
-.bat-ring { width: 72px; height: 72px; }
+.bat-ring { display: block; width: 16.5cqw; height: 16.5cqw; }
 
-.nval { font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
-.nlbl { font-size: 0.68rem; font-weight: 600; color: var(--secondary-text-color,#667085); text-transform: uppercase; letter-spacing: .02em; }
+.nval { font-size: 0.8rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nlbl { font-size: 0.62rem; font-weight: 600; color: var(--secondary-text-color,#667085); text-transform: uppercase; letter-spacing: .04em; }
 
 /* Info row */
 .info-row {
@@ -1091,6 +1067,10 @@ button.sel, .ctrl-toggle.on {
   color: var(--text-primary-color,#fff);
 }
 .ctrl-toggle { white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-dot { display: none; }
+}
 
 @media (max-width: 520px) {
   .info-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
