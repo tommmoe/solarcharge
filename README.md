@@ -10,6 +10,7 @@ It calculates an EV charger current limit from live grid import/export, charger 
 - Calculates safe target EV charging amps.
 - Subtracts current EV load from measured grid import before calculating spare capacity, preventing charge-current feedback loops.
 - Exposes diagnostic sensors for safe limit, base grid import, spare capacity, target amps, and reason.
+- Tracks EV charge sessions: energy delivered today, last session energy, last-charged timestamp, and a 7-day history shown on the dashboard card, with a warning when the car is plugged in but hasn't charged in over 24 hours.
 - Exposes an allowed-to-charge binary sensor.
 - Provides a control-enabled switch, default off.
 - Writes to charger entities only when control is explicitly enabled.

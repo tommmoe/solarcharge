@@ -103,7 +103,10 @@
       "overnight_snapshot_count": { "name": "Overnight snapshot count" },
       "zerohero_import_kwh": { "name": "ZeroHero import (today)" },
       "super_export_kwh": { "name": "Super export (today)" },
-      "current_inverter_slot": { "name": "Active inverter slot" }
+      "current_inverter_slot": { "name": "Active inverter slot" },
+      "ev_energy_today": { "name": "EV energy (today)" },
+      "ev_last_session_energy": { "name": "EV last session energy" },
+      "ev_last_charged": { "name": "EV last charged" }
     },
     "binary_sensor": {
       "allowed_to_charge": { "name": "Allowed to charge" },
@@ -111,7 +114,8 @@
       "grid_sensor_ok": { "name": "Grid sensor OK" },
       "charger_sensor_ok": { "name": "Charger sensor OK" },
       "breaker_limit_ok": { "name": "Breaker limit OK" },
-      "zerohero_eligible": { "name": "ZeroHero credit eligible" }
+      "zerohero_eligible": { "name": "ZeroHero credit eligible" },
+      "ev_charging": { "name": "EV charging" }
     },
     "switch": {
       "enabled": { "name": "Enabled" },

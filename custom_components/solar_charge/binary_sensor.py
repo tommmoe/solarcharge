@@ -56,6 +56,11 @@ BINARY_SENSORS: tuple[SolarChargeBinarySensorDescription, ...] = (
         translation_key="zerohero_eligible",
         value_fn=lambda data: data.get("zerohero_eligible", False),
     ),
+    SolarChargeBinarySensorDescription(
+        key="ev_charging",
+        translation_key="ev_charging",
+        value_fn=lambda data: data.get("ev_charging", False),
+    ),
 )
 
 

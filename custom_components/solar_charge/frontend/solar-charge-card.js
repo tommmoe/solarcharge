@@ -1,37 +1,52 @@
-function f(t) {
-  return t.replace(
+function f(o) {
+  return o.replace(
     /[&<>"']/g,
-    (r) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[r] ?? r
+    (e) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[e] ?? e
   );
 }
-function v(t) {
-  const r = Number(t == null ? void 0 : t.state);
-  return Number.isFinite(r) ? r : 0;
+function u(o) {
+  const e = Number(o == null ? void 0 : o.state);
+  return Number.isFinite(e) ? e : 0;
 }
-function C(t) {
-  return !t || t.state === "unknown" || t.state === "unavailable" ? "-" : t.state;
+function L(o) {
+  return !o || o.state === "unknown" || o.state === "unavailable" ? "-" : o.state;
 }
-function b(t) {
-  return (t == null ? void 0 : t.state) === "on";
+function b(o) {
+  return (o == null ? void 0 : o.state) === "on";
 }
-function c(t) {
-  const r = Number(t == null ? void 0 : t.state);
-  if (!t || !Number.isFinite(r)) return "-";
-  const e = String(t.attributes.unit_of_measurement ?? "W").toLowerCase() === "kw" ? r * 1e3 : r;
-  return Math.abs(e) >= 1e3 ? `${(e / 1e3).toFixed(1)} kW` : `${Math.round(e)} W`;
+function h(o) {
+  const e = Number(o == null ? void 0 : o.state);
+  if (!o || !Number.isFinite(e)) return "-";
+  const r = String(o.attributes.unit_of_measurement ?? "W").toLowerCase() === "kw" ? e * 1e3 : e;
+  return Math.abs(r) >= 1e3 ? `${(r / 1e3).toFixed(1)} kW` : `${Math.round(r)} W`;
 }
-function z(t, r = 2) {
-  return t == null || !Number.isFinite(t) ? "-" : `${t.toFixed(r)} kWh`;
+function S(o, e = 2) {
+  return o == null || !Number.isFinite(o) ? "-" : `${o.toFixed(e)} kWh`;
 }
-function L(t) {
-  const r = Number(t == null ? void 0 : t.state);
-  return !t || !Number.isFinite(r) ? "-" : `${Math.abs(r - Math.round(r)) < 0.05 ? Math.round(r).toString() : r.toFixed(1)} A`;
+function P(o) {
+  const e = Number(o == null ? void 0 : o.state);
+  return !o || !Number.isFinite(e) ? "-" : `${Math.abs(e - Math.round(e)) < 0.05 ? Math.round(e).toString() : e.toFixed(1)} A`;
 }
-function E(t) {
-  const r = Number(t == null ? void 0 : t.state);
-  return !t || !Number.isFinite(r) ? "-" : `${Math.round(r)}%`;
+function H(o) {
+  const e = Number(o == null ? void 0 : o.state);
+  return !o || !Number.isFinite(e) ? "-" : `${Math.round(e)}%`;
 }
-const P = {
+function I(o) {
+  if (!o) return "never";
+  const e = new Date(o).getTime();
+  if (!Number.isFinite(e)) return "never";
+  const t = Math.floor((Date.now() - e) / 6e4);
+  if (t < 1) return "just now";
+  if (t < 60) return `${t}m ago`;
+  const r = Math.floor(t / 60);
+  return r < 24 ? `${r}h ${t % 60}m ago` : `${Math.floor(r / 24)}d ${r % 24}h ago`;
+}
+function N(o) {
+  if (!o) return null;
+  const e = new Date(o).getTime();
+  return Number.isFinite(e) ? (Date.now() - e) / 36e5 : null;
+}
+const O = {
   status: ["sensor", "status"],
   reason: ["sensor", "reason"],
   gridImport: ["sensor", "grid_import"],
@@ -57,14 +72,18 @@ const P = {
   superExportKwh: ["sensor", "super_export_kwh"],
   overnightReservePct: ["sensor", "overnight_reserve_pct"],
   mode: ["select", "mode"],
-  controlEnabled: ["switch", "control_enabled"]
-}, M = [
+  controlEnabled: ["switch", "control_enabled"],
+  evCharging: ["binary_sensor", "ev_charging"],
+  evEnergyToday: ["sensor", "ev_energy_today"],
+  evLastSessionEnergy: ["sensor", "ev_last_session_energy"],
+  evLastCharged: ["sensor", "ev_last_charged"]
+}, R = [
   { label: "Off", option: "Off" },
   { label: "Solar", option: "Solar only" },
   { label: "Free", option: "Free hours only" },
   { label: "Hybrid", option: "Free hours or solar" },
   { label: "Force", option: "Force charge" }
-], k = [
+], C = [
   { start: 0, end: 11, label: "Shoulder", color: "#4b5563", cost: "46.2c" },
   { start: 11, end: 14, label: "Free ☀️", color: "#16a34a", cost: "FREE" },
   { start: 14, end: 16, label: "Shoulder", color: "#4b5563", cost: "46.2c" },
@@ -73,21 +92,21 @@ const P = {
   { start: 21, end: 23, label: "Peak", color: "#b45309", cost: "57.2c" },
   { start: 23, end: 24, label: "Shoulder", color: "#4b5563", cost: "46.2c" }
 ];
-function I(t) {
-  return k.find((r) => t >= r.start && t < r.end) ?? k[0];
+function W(o) {
+  return C.find((e) => o >= e.start && o < e.end) ?? C[0];
 }
-class O extends HTMLElement {
+class D extends HTMLElement {
   constructor() {
-    super(), this.attachShadow({ mode: "open" }), this.shadowRoot.addEventListener("click", (r) => void this._handleClick(r));
+    super(), this.attachShadow({ mode: "open" }), this.shadowRoot.addEventListener("click", (e) => void this._handleClick(e));
   }
-  setConfig(r) {
-    var o;
-    if (!r.entity && !((o = r.entities) != null && o.status))
+  setConfig(e) {
+    var t;
+    if (!e.entity && !((t = e.entities) != null && t.status))
       throw new Error("Solar Charge card requires entity or entities.status");
-    this._config = { title: "Solar Charge", show_controls: !0, ...r }, this._render();
+    this._config = { title: "Solar Charge", show_controls: !0, ...e }, this._render();
   }
-  set hass(r) {
-    this._hass = r, this._render();
+  set hass(e) {
+    this._hass = e, this._render();
   }
   getCardSize() {
     return 8;
@@ -96,106 +115,132 @@ class O extends HTMLElement {
     return { type: "custom:solar-charge-card", entity: "sensor.solar_charge_status", title: "Solar Charge" };
   }
   _baseId() {
-    var o, e, a, s;
-    const r = (s = ((e = (o = this._config) == null ? void 0 : o.entities) == null ? void 0 : e.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : s.split(".")[1];
-    return r != null && r.endsWith("_status") ? r.slice(0, -7) : r;
+    var t, r, a, s;
+    const e = (s = ((r = (t = this._config) == null ? void 0 : t.entities) == null ? void 0 : r.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : s.split(".")[1];
+    return e != null && e.endsWith("_status") ? e.slice(0, -7) : e;
   }
   _ent() {
     var a, s;
-    const r = ((a = this._config) == null ? void 0 : a.entities) ?? {}, o = this._baseId(), e = {};
-    for (const i of Object.keys(P)) {
-      const [p, n] = P[i];
-      e[i] = r[i] ?? (o ? `${p}.${o}_${n}` : void 0);
+    const e = ((a = this._config) == null ? void 0 : a.entities) ?? {}, t = this._baseId(), r = {};
+    for (const l of Object.keys(O)) {
+      const [i, n] = O[l];
+      r[l] = e[l] ?? (t ? `${i}.${t}_${n}` : void 0);
     }
-    return (s = this._config) != null && s.entity && (e.status = r.status ?? this._config.entity), e;
+    return (s = this._config) != null && s.entity && (r.status = e.status ?? this._config.entity), r;
   }
-  _s(r) {
-    var o;
-    return r ? (o = this._hass) == null ? void 0 : o.states[r] : void 0;
+  _s(e) {
+    var t;
+    return e ? (t = this._hass) == null ? void 0 : t.states[e] : void 0;
   }
-  async _handleClick(r) {
-    const o = r.composedPath().find(
+  async _handleClick(e) {
+    const t = e.composedPath().find(
       (a) => a instanceof HTMLElement && a.dataset.action
     );
-    if (!o || !this._hass) return;
-    const e = this._ent();
-    if (o.dataset.action === "mode" && e.mode)
+    if (!t || !this._hass) return;
+    const r = this._ent();
+    if (t.dataset.action === "mode" && r.mode)
       await this._hass.callService("select", "select_option", {
-        entity_id: e.mode,
-        option: o.dataset.option
+        entity_id: r.mode,
+        option: t.dataset.option
       });
-    else if (o.dataset.action === "toggle-control" && e.controlEnabled) {
-      const a = b(this._s(e.controlEnabled));
+    else if (t.dataset.action === "toggle-control" && r.controlEnabled) {
+      const a = b(this._s(r.controlEnabled));
       await this._hass.callService("switch", a ? "turn_off" : "turn_on", {
-        entity_id: e.controlEnabled
+        entity_id: r.controlEnabled
       });
     }
   }
   _render() {
+    var E, F, M;
     if (!this.shadowRoot || !this._config) return;
-    const r = this._ent(), o = C(this._s(r.status)), e = b(this._s(r.allowedToCharge)), a = b(this._s(r.controlEnabled)), s = b(this._s(r.gridSensorOk)) && b(this._s(r.chargerSensorOk)) && b(this._s(r.breakerLimitOk)), i = C(this._s(r.mode)), p = C(this._s(r.chargerStatus)), n = this._carConnected(p), x = this._config.show_controls !== !1, h = s ? e ? "active" : "idle" : "danger", l = /* @__PURE__ */ new Date(), g = l.getHours() + l.getMinutes() / 60, d = I(g), u = g >= 18 && g < 21, w = u && b(this._s(r.zeroheroEligible));
+    const e = this._ent(), t = L(this._s(e.status)), r = b(this._s(e.allowedToCharge)), a = b(this._s(e.controlEnabled)), s = b(this._s(e.gridSensorOk)) && b(this._s(e.chargerSensorOk)) && b(this._s(e.breakerLimitOk)), l = L(this._s(e.mode)), i = L(this._s(e.chargerStatus)), n = this._carConnected(i), c = this._config.show_controls !== !1, d = s ? r ? "active" : "idle" : "danger", p = /* @__PURE__ */ new Date(), v = p.getHours() + p.getMinutes() / 60, g = W(v), m = v >= 18 && v < 21, $ = m && b(this._s(e.zeroheroEligible)), w = b(this._s(e.evCharging)), x = (E = this._s(e.evLastCharged)) == null ? void 0 : E.state, y = !!x && x !== "unknown" && x !== "unavailable", _ = y ? N(x) : null, k = n && !w && (!y || _ != null && _ >= 24);
     this.shadowRoot.innerHTML = `
-      <style>${R}</style>
-      <article class="card ${h}">
+      <style>${A}</style>
+      <article class="card ${d}">
 
         <header class="header">
           <div class="header-left">
             <h2>${f(this._config.title ?? "Solar Charge")}</h2>
-            <p>${f(o)}</p>
+            <p>${f(t)}</p>
           </div>
           <div class="header-right">
-            ${u ? `
-              <div class="zerohero-badge ${w ? "ok" : "risk"}">
-                ${w ? "✓" : "⚠"} ZeroHero
+            ${m ? `
+              <div class="zerohero-badge ${$ ? "ok" : "risk"}">
+                ${$ ? "✓" : "⚠"} ZeroHero
               </div>` : ""}
-            <div class="period-badge" style="background:${d.color}20;color:${d.color};border-color:${d.color}40">
-              ${f(d.label)} · ${f(d.cost)}
+            <div class="period-badge" style="background:${g.color}20;color:${g.color};border-color:${g.color}40">
+              ${f(g.label)} · ${f(g.cost)}
             </div>
-            <div class="status-pill ${h}">
-              <span></span>${e ? "Charging" : s ? "Waiting" : "Check"}
+            <div class="status-pill ${d}">
+              <span></span>${r ? "Charging" : s ? "Waiting" : "Check"}
             </div>
           </div>
         </header>
 
+        ${k ? `
+          <section class="stale-banner">
+            ⚠ Plugged in but hasn't charged ${y ? `in ${I(x).replace(" ago", "")}` : "yet"} — check reason below
+          </section>` : ""}
+
         <section class="flow-section">
-          ${this._renderFlow(r)}
+          ${this._renderFlow(e)}
         </section>
 
         <section class="info-row">
-          <div><span class="lbl">Mode</span><strong>${f(i)}</strong></div>
+          <div><span class="lbl">Mode</span><strong>${f(l)}</strong></div>
           <div><span class="lbl">Control</span><strong>${a ? "On" : "Off"}</strong></div>
           <div><span class="lbl">Car</span><strong>${n ? "Connected" : "Away"}</strong></div>
-          <div><span class="lbl">Free window</span><strong>${b(this._s(r.inFreeWindow)) ? "Active ☀️" : "—"}</strong></div>
+          <div><span class="lbl">Free window</span><strong>${b(this._s(e.inFreeWindow)) ? "Active ☀️" : "—"}</strong></div>
         </section>
 
         <section class="metrics-grid">
-          ${this._metric("Base import", c(this._s(r.baseGridImport)), "excl. EV")}
-          ${this._metric("Safe limit", c(this._s(r.safeImportLimit)), "breaker")}
-          ${this._metric("Spare", c(this._s(r.spareCapacity)), "headroom")}
-          ${this._metric("Target", L(this._s(r.targetAmps)), "calc. limit")}
-          ${this._metric("Actual", L(this._s(r.actualCurrent)), "charger")}
-          ${this._metric("Reserve", E(this._s(r.overnightReservePct)), "overnight")}
+          ${this._metric("Base import", h(this._s(e.baseGridImport)), "excl. EV")}
+          ${this._metric("Safe limit", h(this._s(e.safeImportLimit)), "breaker")}
+          ${this._metric("Spare", h(this._s(e.spareCapacity)), "headroom")}
+          ${this._metric("Target", P(this._s(e.targetAmps)), "calc. limit")}
+          ${this._metric("Actual", P(this._s(e.actualCurrent)), "charger")}
+          ${this._metric("Reserve", H(this._s(e.overnightReservePct)), "overnight")}
+        </section>
+
+        <section class="ev-history">
+          <div class="ev-stats">
+            <div>
+              <span class="lbl">EV today</span>
+              <strong>${S(Number((F = this._s(e.evEnergyToday)) == null ? void 0 : F.state), 1)}</strong>
+            </div>
+            <div>
+              <span class="lbl">Last session</span>
+              <strong>${S(Number((M = this._s(e.evLastSessionEnergy)) == null ? void 0 : M.state), 1)}</strong>
+            </div>
+            <div>
+              <span class="lbl">Last charged</span>
+              <strong class="${k ? "warn-text" : ""}">
+                ${w ? "Charging now ⚡" : y ? I(x) : "never"}
+              </strong>
+            </div>
+          </div>
+          ${this._renderEvWeek(e)}
         </section>
 
         <section class="reason-row">
           <span class="lbl">Reason</span>
-          <p>${f(C(this._s(r.reason)))}</p>
+          <p>${f(L(this._s(e.reason)))}</p>
         </section>
 
         <section class="safety-row">
-          ${this._safetyItem("Grid sensor", b(this._s(r.gridSensorOk)))}
-          ${this._safetyItem("Charger", b(this._s(r.chargerSensorOk)))}
-          ${this._safetyItem("Breaker", b(this._s(r.breakerLimitOk)))}
-          ${this._safetyItem("Free window", b(this._s(r.inFreeWindow)))}
+          ${this._safetyItem("Grid sensor", b(this._s(e.gridSensorOk)))}
+          ${this._safetyItem("Charger", b(this._s(e.chargerSensorOk)))}
+          ${this._safetyItem("Breaker", b(this._s(e.breakerLimitOk)))}
+          ${this._safetyItem("Free window", b(this._s(e.inFreeWindow)))}
         </section>
 
-        ${x ? `
+        ${c ? `
           <section class="controls-row">
             <div class="mode-buttons">
-              ${M.map((m) => `
-                <button class="${i === m.option ? "sel" : ""}"
-                  data-action="mode" data-option="${m.option}" type="button">
-                  ${m.label}
+              ${R.map((z) => `
+                <button class="${l === z.option ? "sel" : ""}"
+                  data-action="mode" data-option="${z.option}" type="button">
+                  ${z.label}
                 </button>`).join("")}
             </div>
             <button class="ctrl-toggle ${a ? "on" : ""}"
@@ -207,138 +252,166 @@ class O extends HTMLElement {
       </article>`;
   }
   // ── Power flow diagram ────────────────────────────────────────────────
-  _renderFlow(r) {
-    const o = v(this._s(r.pvPower)), e = v(this._s(r.gridImport)), a = v(this._s(r.batteryPower)), s = v(this._s(r.chargerPower)), i = v(this._s(r.loadPower)), p = v(this._s(r.batterySoc)), n = o > 50, x = e > 50, h = e < -50, l = a > 50, g = a < -50, d = s > 50, u = i > 50, w = "#f59e0b", m = h ? "#22c55e" : "#ef4444", y = l ? "#3b82f6" : g ? "#f59e0b" : "#6b7280", _ = "#a855f7", $ = "#64748b";
+  _renderFlow(e) {
+    const t = u(this._s(e.pvPower)), r = u(this._s(e.gridImport)), a = u(this._s(e.batteryPower)), s = u(this._s(e.chargerPower)), l = u(this._s(e.loadPower)), i = u(this._s(e.batterySoc)), n = t > 50, c = r > 50, d = r < -50, p = a > 50, v = a < -50, g = s > 50, m = l > 50, $ = "#f59e0b", w = d ? "#22c55e" : "#ef4444", x = p ? "#3b82f6" : v ? "#f59e0b" : "#6b7280", y = "#a855f7", _ = "#64748b";
     return `
     <div class="flow-wrap">
       <!-- SVG layer for paths -->
       <svg class="flow-svg" viewBox="0 0 360 260" preserveAspectRatio="xMidYMid meet">
         <defs>
           ${this._gradDef("g-pv", "#f59e0b", n)}
-          ${this._gradDef("g-grid", m, x || h)}
-          ${this._gradDef("g-bat", y, l || g)}
-          ${this._gradDef("g-ev", _, d)}
-          ${this._gradDef("g-load", $, u)}
+          ${this._gradDef("g-grid", w, c || d)}
+          ${this._gradDef("g-bat", x, p || v)}
+          ${this._gradDef("g-ev", y, g)}
+          ${this._gradDef("g-load", _, m)}
         </defs>
 
         <!-- Solar → Home -->
         ${this._flowPath(
       "M 72 55 C 72 130 180 55 180 130",
       n,
-      w,
+      $,
       "g-pv",
       "0 → 1",
-      c(this._s(r.pvPower))
+      h(this._s(e.pvPower))
     )}
 
         <!-- Grid → Home  /  Home → Grid -->
         ${this._flowPath(
       "M 288 55 C 288 130 180 55 180 130",
-      x,
-      m,
+      c,
+      w,
       "g-grid",
       "1 → 0",
-      x ? c(this._s(r.gridImport)) : ""
+      c ? h(this._s(e.gridImport)) : ""
     )}
         ${this._flowPath(
       "M 180 130 C 180 55 288 130 288 55",
-      h,
+      d,
       "#22c55e",
       "g-grid",
       "0 → 1",
-      h ? c(this._s(r.gridImport)) : ""
+      d ? h(this._s(e.gridImport)) : ""
     )}
 
         <!-- Home → Battery  /  Battery → Home -->
         ${this._flowPath(
       "M 180 130 C 180 210 60 130 60 210",
-      l,
-      y,
+      p,
+      x,
       "g-bat",
       "0 → 1",
-      l ? c(this._s(r.batteryPower)) : ""
+      p ? h(this._s(e.batteryPower)) : ""
     )}
         ${this._flowPath(
       "M 60 210 C 60 130 180 210 180 130",
-      g,
-      y,
+      v,
+      x,
       "g-bat",
       "0 → 1",
-      g ? c(this._s(r.batteryPower)) : ""
+      v ? h(this._s(e.batteryPower)) : ""
     )}
 
         <!-- Home → EV -->
         ${this._flowPath(
       "M 180 130 L 180 210",
-      d,
-      _,
+      g,
+      y,
       "g-ev",
       "0 → 1",
-      d ? c(this._s(r.chargerPower)) : ""
+      g ? h(this._s(e.chargerPower)) : ""
     )}
 
         <!-- Home → Load -->
         ${this._flowPath(
       "M 180 130 C 180 210 300 130 300 210",
-      u,
-      $,
+      m,
+      _,
       "g-load",
       "0 → 1",
-      u ? c(this._s(r.loadPower)) : ""
+      m ? h(this._s(e.loadPower)) : ""
     )}
       </svg>
 
       <!-- Nodes -->
-      <div class="node solar ${n ? "on" : ""}" style="--nc:${w}">
+      <div class="node solar ${n ? "on" : ""}" style="--nc:${$}">
         ${this._solarIcon()}
-        <div class="nval">${c(this._s(r.pvPower))}</div>
+        <div class="nval">${h(this._s(e.pvPower))}</div>
         <div class="nlbl">Solar</div>
       </div>
 
-      <div class="node grid ${x ? "on" : h ? "exp" : ""}" style="--nc:${m}">
+      <div class="node grid ${c ? "on" : d ? "exp" : ""}" style="--nc:${w}">
         ${this._gridIcon()}
-        <div class="nval">${c(this._s(r.gridImport))}</div>
-        <div class="nlbl">${h ? "Exporting" : "Grid"}</div>
+        <div class="nval">${h(this._s(e.gridImport))}</div>
+        <div class="nlbl">${d ? "Exporting" : "Grid"}</div>
       </div>
 
       <div class="node home" style="--nc:var(--primary-color,#1d6f9f)">
         ${this._homeIcon()}
       </div>
 
-      <div class="node battery ${l ? "chg" : g ? "dis" : ""}" style="--nc:${y}">
-        ${this._batteryRing(p, l, g)}
-        <div class="nval">${c(this._s(r.batteryPower))}</div>
+      <div class="node battery ${p ? "chg" : v ? "dis" : ""}" style="--nc:${x}">
+        ${this._batteryRing(i, p, v)}
+        <div class="nval">${h(this._s(e.batteryPower))}</div>
         <div class="nlbl">Battery</div>
       </div>
 
-      <div class="node ev ${d ? "on" : ""}" style="--nc:${_}">
-        ${this._evIcon(d)}
-        <div class="nval">${c(this._s(r.chargerPower))}</div>
+      <div class="node ev ${g ? "on" : ""}" style="--nc:${y}">
+        ${this._evIcon(g)}
+        <div class="nval">${h(this._s(e.chargerPower))}</div>
         <div class="nlbl">EV</div>
       </div>
 
-      <div class="node house-load ${u ? "on" : ""}" style="--nc:${$}">
+      <div class="node house-load ${m ? "on" : ""}" style="--nc:${_}">
         ${this._loadIcon()}
-        <div class="nval">${c(this._s(r.loadPower))}</div>
+        <div class="nval">${h(this._s(e.loadPower))}</div>
         <div class="nlbl">Load</div>
       </div>
     </div>`;
   }
-  _gradDef(r, o, e) {
-    return e ? `<linearGradient id="${r}" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${o}" stop-opacity="0.9"/>
-      <stop offset="100%" stop-color="${o}" stop-opacity="0.4"/>
+  _gradDef(e, t, r) {
+    return r ? `<linearGradient id="${e}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${t}" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="${t}" stop-opacity="0.4"/>
     </linearGradient>` : "";
   }
-  _flowPath(r, o, e, a, s, i) {
-    return o ? `
-      <path d="${r}" fill="none" stroke="${e}" stroke-width="3" stroke-opacity="0.35" stroke-linecap="round"/>
-      <path d="${r}" fill="none" stroke="${e}" stroke-width="3" stroke-linecap="round"
+  _flowPath(e, t, r, a, s, l) {
+    return t ? `
+      <path d="${e}" fill="none" stroke="${r}" stroke-width="3" stroke-opacity="0.35" stroke-linecap="round"/>
+      <path d="${e}" fill="none" stroke="${r}" stroke-width="3" stroke-linecap="round"
         stroke-dasharray="6 10">
         <animate attributeName="stroke-dashoffset"
           from="${s === "0 → 1" ? "0" : "24"}" to="${s === "0 → 1" ? "24" : "0"}" dur="1.2s" repeatCount="indefinite"/>
       </path>
-      ${i ? `<title>${i}</title>` : ""}` : `<path d="${r}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.2))" stroke-width="2"/>`;
+      ${l ? `<title>${l}</title>` : ""}` : `<path d="${e}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.2))" stroke-width="2"/>`;
+  }
+  // ── EV 7-day history strip ────────────────────────────────────────────
+  _renderEvWeek(e) {
+    var s, l;
+    const t = (l = (s = this._s(e.evEnergyToday)) == null ? void 0 : s.attributes) == null ? void 0 : l.daily_totals, r = [];
+    for (let i = 6; i >= 0; i--) {
+      const n = /* @__PURE__ */ new Date();
+      n.setDate(n.getDate() - i);
+      const c = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`, d = Number((t == null ? void 0 : t[c]) ?? 0);
+      r.push({
+        date: c,
+        kwh: Number.isFinite(d) ? d : 0,
+        label: ["S", "M", "T", "W", "T", "F", "S"][n.getDay()]
+      });
+    }
+    const a = Math.max(...r.map((i) => i.kwh), 1);
+    return `
+    <div class="ev-week">
+      ${r.map((i, n) => `
+        <div class="ev-day" title="${i.date}: ${i.kwh.toFixed(1)} kWh">
+          <span class="ev-day-val">${i.kwh >= 0.05 ? i.kwh.toFixed(1) : ""}</span>
+          <div class="ev-day-bar">
+            <div class="ev-day-fill ${i.kwh >= 0.05 ? "" : "empty"} ${n === 6 ? "today" : ""}"
+              style="height:${Math.max(4, i.kwh / a * 100).toFixed(1)}%"></div>
+          </div>
+          <span class="ev-day-lbl ${n === 6 ? "today" : ""}">${i.label}</span>
+        </div>`).join("")}
+    </div>`;
   }
   // ── Node icons ────────────────────────────────────────────────────────
   _solarIcon() {
@@ -396,52 +469,52 @@ class O extends HTMLElement {
       <line x1="12" y1="13" x2="12" y2="14"/>
     </svg>`;
   }
-  _batteryRing(r, o, e) {
-    const p = 2 * Math.PI * 26, n = r / 100 * p, x = o ? "#3b82f6" : e ? "#f59e0b" : r > 50 ? "#22c55e" : r > 20 ? "#f59e0b" : "#ef4444";
+  _batteryRing(e, t, r) {
+    const i = 2 * Math.PI * 26, n = e / 100 * i, c = t ? "#3b82f6" : r ? "#f59e0b" : e > 50 ? "#22c55e" : e > 20 ? "#f59e0b" : "#ef4444";
     return `
     <svg class="bat-ring" viewBox="0 0 72 72">
       <circle cx="36" cy="36" r="26" fill="none"
         stroke="var(--divider-color,rgba(127,127,127,0.18))" stroke-width="6"/>
       <circle cx="36" cy="36" r="26" fill="none"
-        stroke="${x}" stroke-width="6" stroke-linecap="round"
-        stroke-dasharray="${n.toFixed(1)} ${p.toFixed(1)}"
+        stroke="${c}" stroke-width="6" stroke-linecap="round"
+        stroke-dasharray="${n.toFixed(1)} ${i.toFixed(1)}"
         transform="rotate(-90 36 36)"/>
       <text x="36" y="42" text-anchor="middle"
-        font-size="15" font-weight="700" fill="${x}" stroke="none">${Math.round(r)}%</text>
+        font-size="15" font-weight="700" fill="${c}" stroke="none">${Math.round(e)}%</text>
     </svg>`;
   }
-  _evIcon(r) {
+  _evIcon(e) {
     return `<svg class="nicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <rect x="3" y="9" width="18" height="10" rx="2"/>
       <path d="M7 9 L7 6 C7 5.5 7.5 5 8 5 L16 5 C16.5 5 17 5.5 17 6 L17 9"/>
       <rect x="5" y="11" width="5" height="3" rx="0.5"/>
       <rect x="14" y="11" width="5" height="3" rx="0.5"/>
       <line x1="12" y1="11" x2="12" y2="14"/>
-      ${r ? '<path d="M11.5 5.5 L10 8 L11.5 8 L10 11" fill="none" stroke="#a855f7" stroke-width="1.5"/>' : ""}
+      ${e ? '<path d="M11.5 5.5 L10 8 L11.5 8 L10 11" fill="none" stroke="#a855f7" stroke-width="1.5"/>' : ""}
       <line x1="7" y1="19" x2="7" y2="21"/>
       <line x1="17" y1="19" x2="17" y2="21"/>
     </svg>`;
   }
   // ── Small helper renderers ────────────────────────────────────────────
-  _metric(r, o, e) {
+  _metric(e, t, r) {
     return `<div class="metric">
-      <span class="lbl">${f(r)}</span>
-      <strong>${f(o)}</strong>
-      <small>${f(e)}</small>
+      <span class="lbl">${f(e)}</span>
+      <strong>${f(t)}</strong>
+      <small>${f(r)}</small>
     </div>`;
   }
-  _safetyItem(r, o) {
-    return `<div class="safety-item ${o ? "ok" : "bad"}">
-      <span></span>${f(r)}
+  _safetyItem(e, t) {
+    return `<div class="safety-item ${t ? "ok" : "bad"}">
+      <span></span>${f(e)}
     </div>`;
   }
-  _carConnected(r) {
-    if (!r || r === "-") return !1;
-    const o = r.toLowerCase();
-    return !["available", "unavailable", "disconnected", "not connected", "idle", "ready"].includes(o);
+  _carConnected(e) {
+    if (!e || e === "-") return !1;
+    const t = e.toLowerCase();
+    return !["available", "unavailable", "disconnected", "not connected", "idle", "ready"].includes(t);
   }
 }
-const F = {
+const T = {
   status: ["sensor", "status"],
   zeroheroEligible: ["binary_sensor", "zerohero_eligible"],
   zeroheroImportKwh: ["sensor", "zerohero_import_kwh"],
@@ -452,15 +525,15 @@ const F = {
   batterySoc: ["sensor", "battery_soc"],
   currentInverterSlot: ["sensor", "current_inverter_slot"]
 };
-class H extends HTMLElement {
+class j extends HTMLElement {
   constructor() {
     super(), this.attachShadow({ mode: "open" });
   }
-  setConfig(r) {
-    this._config = { title: "Energy Schedule", battery_capacity_kwh: 48, ...r }, this._render();
+  setConfig(e) {
+    this._config = { title: "Energy Schedule", battery_capacity_kwh: 48, ...e }, this._render();
   }
-  set hass(r) {
-    this._hass = r, this._render();
+  set hass(e) {
+    this._hass = e, this._render();
   }
   getCardSize() {
     return 6;
@@ -469,29 +542,29 @@ class H extends HTMLElement {
     return { type: "custom:solar-charge-tariff-card", entity: "sensor.solar_charge_status" };
   }
   _baseId() {
-    var o, e, a, s;
-    const r = (s = ((e = (o = this._config) == null ? void 0 : o.entities) == null ? void 0 : e.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : s.split(".")[1];
-    return r != null && r.endsWith("_status") ? r.slice(0, -7) : r;
+    var t, r, a, s;
+    const e = (s = ((r = (t = this._config) == null ? void 0 : t.entities) == null ? void 0 : r.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : s.split(".")[1];
+    return e != null && e.endsWith("_status") ? e.slice(0, -7) : e;
   }
   _ent() {
     var a, s;
-    const r = ((a = this._config) == null ? void 0 : a.entities) ?? {}, o = this._baseId(), e = {};
-    for (const i of Object.keys(F)) {
-      const [p, n] = F[i];
-      e[i] = r[i] ?? (o ? `${p}.${o}_${n}` : void 0);
+    const e = ((a = this._config) == null ? void 0 : a.entities) ?? {}, t = this._baseId(), r = {};
+    for (const l of Object.keys(T)) {
+      const [i, n] = T[l];
+      r[l] = e[l] ?? (t ? `${i}.${t}_${n}` : void 0);
     }
-    return (s = this._config) != null && s.entity && (e.status = r.status ?? this._config.entity), e;
+    return (s = this._config) != null && s.entity && (r.status = e.status ?? this._config.entity), r;
   }
-  _s(r) {
-    var o;
-    return r ? (o = this._hass) == null ? void 0 : o.states[r] : void 0;
+  _s(e) {
+    var t;
+    return e ? (t = this._hass) == null ? void 0 : t.states[e] : void 0;
   }
   _render() {
-    var _, $;
+    var y, _;
     if (!this.shadowRoot || !this._config) return;
-    const r = this._ent(), o = /* @__PURE__ */ new Date(), e = o.getHours() + o.getMinutes() / 60, a = I(e), s = this._config.battery_capacity_kwh ?? 48, i = b(this._s(r.zeroheroEligible)), p = v(this._s(r.zeroheroImportKwh)), n = v(this._s(r.superExportKwh)), x = v(this._s(r.overnightAvgConsumption)) || null, h = v(this._s(r.overnightReservePct)), l = v(this._s(r.overnightSnapshotCount)), g = v(this._s(r.currentInverterSlot)) || 0, d = v(this._s(r.batterySoc)), u = e >= 18 && e < 21, w = ((_ = k.find((S) => S.start > e)) == null ? void 0 : _.start) ?? k[0].start + 24, m = Math.round((w - e) * 60), y = (($ = k.find((S) => S.start === w % 24)) == null ? void 0 : $.label) ?? "";
+    const e = this._ent(), t = /* @__PURE__ */ new Date(), r = t.getHours() + t.getMinutes() / 60, a = W(r), s = this._config.battery_capacity_kwh ?? 48, l = b(this._s(e.zeroheroEligible)), i = u(this._s(e.zeroheroImportKwh)), n = u(this._s(e.superExportKwh)), c = u(this._s(e.overnightAvgConsumption)) || null, d = u(this._s(e.overnightReservePct)), p = u(this._s(e.overnightSnapshotCount)), v = u(this._s(e.currentInverterSlot)) || 0, g = u(this._s(e.batterySoc)), m = r >= 18 && r < 21, $ = ((y = C.find((k) => k.start > r)) == null ? void 0 : y.start) ?? C[0].start + 24, w = Math.round(($ - r) * 60), x = ((_ = C.find((k) => k.start === $ % 24)) == null ? void 0 : _.label) ?? "";
     this.shadowRoot.innerHTML = `
-      <style>${W}</style>
+      <style>${B}</style>
       <article class="card">
 
         <header class="t-header">
@@ -502,37 +575,37 @@ class H extends HTMLElement {
         </header>
 
         <section class="timeline-wrap">
-          ${this._renderTimeline(e)}
+          ${this._renderTimeline(r)}
           <div class="next-period">
-            Next: <strong>${f(y)}</strong>
-            in ${Math.floor(m / 60)}h ${m % 60}m
+            Next: <strong>${f(x)}</strong>
+            in ${Math.floor(w / 60)}h ${w % 60}m
           </div>
         </section>
 
         <section class="two-col">
 
           <!-- ZeroHero -->
-          <div class="panel ${u ? i ? "panel-ok" : "panel-warn" : "panel-dim"}">
+          <div class="panel ${m ? l ? "panel-ok" : "panel-warn" : "panel-dim"}">
             <div class="panel-title">🏆 ZeroHero Credit</div>
             <div class="panel-sub">$1/day if imports ≤ 0.09 kWh (6pm–9pm)</div>
-            ${u ? `
+            ${m ? `
               <div class="bar-wrap">
                 <div class="bar-track">
-                  <div class="bar-fill ${i ? "green" : "red"}"
-                    style="width:${Math.min(100, p / 0.09 * 100).toFixed(1)}%"></div>
+                  <div class="bar-fill ${l ? "green" : "red"}"
+                    style="width:${Math.min(100, i / 0.09 * 100).toFixed(1)}%"></div>
                 </div>
-                <span class="bar-val">${p.toFixed(3)} / 0.09 kWh</span>
+                <span class="bar-val">${i.toFixed(3)} / 0.09 kWh</span>
               </div>
-              <div class="panel-status ${i ? "ok" : "bad"}">
-                ${i ? "✓ On track" : "✗ Limit exceeded"}
-              </div>` : e >= 21 ? '<div class="panel-status dim">Window closed</div>' : `<div class="panel-status dim">Window starts ${21 - Math.ceil(e)}h ${e < 18 ? Math.round((18 - e) * 60) + "m" : ""}~</div>`}
+              <div class="panel-status ${l ? "ok" : "bad"}">
+                ${l ? "✓ On track" : "✗ Limit exceeded"}
+              </div>` : r >= 21 ? '<div class="panel-status dim">Window closed</div>' : `<div class="panel-status dim">Window starts ${21 - Math.ceil(r)}h ${r < 18 ? Math.round((18 - r) * 60) + "m" : ""}~</div>`}
           </div>
 
           <!-- Super Export -->
-          <div class="panel ${u ? "panel-purple" : "panel-dim"}">
+          <div class="panel ${m ? "panel-purple" : "panel-dim"}">
             <div class="panel-title">⚡ Super Export</div>
             <div class="panel-sub">15c/kWh on first 15 kWh (6pm–9pm)</div>
-            ${u || n > 0 ? `
+            ${m || n > 0 ? `
               <div class="bar-wrap">
                 <div class="bar-track">
                   <div class="bar-fill purple"
@@ -542,7 +615,7 @@ class H extends HTMLElement {
               </div>
               <div class="panel-status purple">
                 ≈ $${(n * 0.2).toFixed(2)} earned
-              </div>` : `<div class="panel-status dim">${e < 18 ? "Starts at 6pm" : "No data yet"}</div>`}
+              </div>` : `<div class="panel-status dim">${r < 18 ? "Starts at 6pm" : "No data yet"}</div>`}
           </div>
 
         </section>
@@ -551,40 +624,40 @@ class H extends HTMLElement {
           <div class="panel-title">🔋 Overnight Reserve</div>
           <div class="overnight-grid">
             <div class="ov-stat">
-              <span class="ov-val">${x != null ? z(x) : "—"}</span>
+              <span class="ov-val">${c != null ? S(c) : "—"}</span>
               <span class="ov-lbl">Avg overnight use</span>
-              <span class="ov-sub">${l} day${l !== 1 ? "s" : ""} of data</span>
+              <span class="ov-sub">${p} day${p !== 1 ? "s" : ""} of data</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${h ? h + "%" : "—"}</span>
+              <span class="ov-val">${d ? d + "%" : "—"}</span>
               <span class="ov-lbl">Reserve target</span>
-              <span class="ov-sub">≈ ${h ? z(h / 100 * s) : "—"}</span>
+              <span class="ov-sub">≈ ${d ? S(d / 100 * s) : "—"}</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${d ? Math.round(d) + "%" : "—"}</span>
+              <span class="ov-val">${g ? Math.round(g) + "%" : "—"}</span>
               <span class="ov-lbl">Current SOC</span>
-              <span class="ov-sub">≈ ${z(d / 100 * s)}</span>
+              <span class="ov-sub">≈ ${S(g / 100 * s)}</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${g ? `Slot ${g}` : "—"}</span>
+              <span class="ov-val">${v ? `Slot ${v}` : "—"}</span>
               <span class="ov-lbl">Active slot</span>
-              <span class="ov-sub">${this._slotLabel(g)}</span>
+              <span class="ov-sub">${this._slotLabel(v)}</span>
             </div>
           </div>
-          ${l < 3 ? `<p class="data-notice">Collecting data — ${3 - l} more night${3 - l !== 1 ? "s" : ""} needed for smart reserve.</p>` : ""}
+          ${p < 3 ? `<p class="data-notice">Collecting data — ${3 - p} more night${3 - p !== 1 ? "s" : ""} needed for smart reserve.</p>` : ""}
         </section>
 
       </article>`;
   }
-  _renderTimeline(r) {
-    const e = k.map((s) => {
-      const i = (s.end - s.start) / 24 * 100;
+  _renderTimeline(e) {
+    const r = C.map((s) => {
+      const l = (s.end - s.start) / 24 * 100;
       return s.start / 24 * 100, `<div class="t-bar" title="${s.label} ${s.cost}"
-        style="width:${i.toFixed(2)}%;background:${s.color};opacity:0.85"></div>`;
-    }).join(""), a = r / 24 * 100;
+        style="width:${l.toFixed(2)}%;background:${s.color};opacity:0.85"></div>`;
+    }).join(""), a = e / 24 * 100;
     return `
     <div class="timeline">
-      <div class="t-bars">${e}</div>
+      <div class="t-bars">${r}</div>
       <div class="t-now" style="left:${a.toFixed(2)}%">
         <div class="t-now-line"></div>
         <div class="t-now-label">Now</div>
@@ -596,7 +669,7 @@ class H extends HTMLElement {
       </div>
     </div>`;
   }
-  _slotLabel(r) {
+  _slotLabel(e) {
     return {
       1: "00:00 coast",
       2: "11:00 free charge",
@@ -604,10 +677,10 @@ class H extends HTMLElement {
       4: "16:00 peak",
       5: "18:00 export",
       6: "21:00 reserve"
-    }[r] ?? "—";
+    }[e] ?? "—";
   }
 }
-const R = `
+const A = `
 :host { display: block; color: var(--primary-text-color, #1f2933); }
 
 .card {
@@ -732,6 +805,44 @@ strong { display: block; font-size: 0.95rem; line-height: 1.25; overflow-wrap: a
 .metric strong { font-size: 1.15rem; font-weight: 720; }
 .metric small  { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--secondary-text-color,#667085); }
 
+/* Stale-charge warning banner */
+.stale-banner {
+  padding: 9px 16px;
+  background: rgba(245,158,11,.14);
+  border-top: 1px solid rgba(245,158,11,.4);
+  border-bottom: 1px solid rgba(245,158,11,.4);
+  color: #b45309;
+  font-size: 0.85rem; font-weight: 700; line-height: 1.3;
+}
+
+/* EV charge history */
+.ev-history {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--divider-color,rgba(127,127,127,.18));
+}
+.ev-stats {
+  display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 8px; margin-bottom: 10px;
+}
+.warn-text { color: #b45309; }
+.ev-week {
+  display: grid; grid-template-columns: repeat(7, minmax(0,1fr));
+  gap: 6px; align-items: end;
+}
+.ev-day { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ev-day-val { font-size: 0.62rem; font-weight: 700; color: var(--secondary-text-color,#667085); min-height: 12px; }
+.ev-day-bar {
+  width: 100%; max-width: 34px; height: 44px;
+  display: flex; align-items: flex-end;
+  background: color-mix(in srgb, var(--divider-color,rgba(127,127,127,.18)) 50%, transparent);
+  border-radius: 5px; overflow: hidden;
+}
+.ev-day-fill { width: 100%; background: #a855f7; border-radius: 5px 5px 0 0; }
+.ev-day-fill.empty { background: var(--divider-color,rgba(127,127,127,.3)); }
+.ev-day-fill.today { background: #7c3aed; }
+.ev-day-lbl { font-size: 0.64rem; font-weight: 700; color: var(--secondary-text-color,#667085); }
+.ev-day-lbl.today { color: var(--primary-text-color,#1f2933); }
+
 /* Reason */
 .reason-row {
   padding: 10px 16px 10px;
@@ -783,7 +894,7 @@ button.sel, .ctrl-toggle.on {
   .mode-buttons { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .header-right { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
 }
-`, W = `
+`, B = `
 :host { display: block; color: var(--primary-text-color, #1f2933); }
 
 .card {
@@ -885,8 +996,8 @@ h2 { margin: 0; font-size: 1.1rem; font-weight: 650; }
   .t-header { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 `;
-customElements.get("solar-charge-card") || customElements.define("solar-charge-card", O);
-customElements.get("solar-charge-tariff-card") || customElements.define("solar-charge-tariff-card", H);
+customElements.get("solar-charge-card") || customElements.define("solar-charge-card", D);
+customElements.get("solar-charge-tariff-card") || customElements.define("solar-charge-tariff-card", j);
 window.customCards = window.customCards || [];
 window.customCards.push(
   {

@@ -67,6 +67,26 @@ function fmtPct(state: EntityState | undefined): string {
   return `${Math.round(v)}%`;
 }
 
+function fmtRelTime(iso: string | undefined): string {
+  if (!iso) return "never";
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "never";
+  const mins = Math.floor((Date.now() - then) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ${mins % 60}m ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h ago`;
+}
+
+function hoursSince(iso: string | undefined): number | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  return (Date.now() - then) / 3600000;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Card 1 — Power Flow
 // ═══════════════════════════════════════════════════════════════════════════
@@ -78,7 +98,8 @@ type FlowEntityKey =
   | "chargerStatus" | "allowedToCharge" | "inFreeWindow" | "gridSensorOk"
   | "chargerSensorOk" | "breakerLimitOk" | "mode" | "controlEnabled"
   | "zeroheroEligible" | "zeroheroImportKwh" | "superExportKwh"
-  | "overnightReservePct";
+  | "overnightReservePct"
+  | "evCharging" | "evEnergyToday" | "evLastSessionEnergy" | "evLastCharged";
 
 type FlowCardConfig = {
   type: string;
@@ -115,6 +136,10 @@ const FLOW_SUFFIXES: Record<FlowEntityKey, [string, string]> = {
   overnightReservePct:["sensor",        "overnight_reserve_pct"],
   mode:               ["select",        "mode"],
   controlEnabled:     ["switch",        "control_enabled"],
+  evCharging:         ["binary_sensor", "ev_charging"],
+  evEnergyToday:      ["sensor",        "ev_energy_today"],
+  evLastSessionEnergy:["sensor",        "ev_last_session_energy"],
+  evLastCharged:      ["sensor",        "ev_last_charged"],
 };
 
 const MODE_OPTIONS = [
@@ -233,6 +258,15 @@ class SolarChargeCard extends HTMLElement {
     const inExportWindow = nowH >= 18 && nowH < 21;
     const zeroheroOk = inExportWindow && isOn(this._s(ent.zeroheroEligible));
 
+    // EV charge history
+    const evCharging = isOn(this._s(ent.evCharging));
+    const lastChargedIso = this._s(ent.evLastCharged)?.state;
+    const lastChargedOk = !!lastChargedIso &&
+      lastChargedIso !== "unknown" && lastChargedIso !== "unavailable";
+    const idleHours = lastChargedOk ? hoursSince(lastChargedIso) : null;
+    const staleCharge = carConnected && !evCharging &&
+      (!lastChargedOk || (idleHours != null && idleHours >= 24));
+
     this.shadowRoot.innerHTML = `
       <style>${FLOW_CSS}</style>
       <article class="card ${statusClass}">
@@ -256,6 +290,13 @@ class SolarChargeCard extends HTMLElement {
           </div>
         </header>
 
+        ${staleCharge ? `
+          <section class="stale-banner">
+            ⚠ Plugged in but hasn't charged ${lastChargedOk
+              ? `in ${fmtRelTime(lastChargedIso).replace(" ago", "")}`
+              : "yet"} — check reason below
+          </section>` : ""}
+
         <section class="flow-section">
           ${this._renderFlow(ent)}
         </section>
@@ -274,6 +315,26 @@ class SolarChargeCard extends HTMLElement {
           ${this._metric("Target",      fmtCurrent(this._s(ent.targetAmps)),    "calc. limit")}
           ${this._metric("Actual",      fmtCurrent(this._s(ent.actualCurrent)), "charger")}
           ${this._metric("Reserve",     fmtPct(this._s(ent.overnightReservePct)), "overnight")}
+        </section>
+
+        <section class="ev-history">
+          <div class="ev-stats">
+            <div>
+              <span class="lbl">EV today</span>
+              <strong>${fmtKwh(Number(this._s(ent.evEnergyToday)?.state), 1)}</strong>
+            </div>
+            <div>
+              <span class="lbl">Last session</span>
+              <strong>${fmtKwh(Number(this._s(ent.evLastSessionEnergy)?.state), 1)}</strong>
+            </div>
+            <div>
+              <span class="lbl">Last charged</span>
+              <strong class="${staleCharge ? "warn-text" : ""}">
+                ${evCharging ? "Charging now ⚡" : lastChargedOk ? fmtRelTime(lastChargedIso) : "never"}
+              </strong>
+            </div>
+          </div>
+          ${this._renderEvWeek(ent)}
         </section>
 
         <section class="reason-row">
@@ -430,6 +491,40 @@ class SolarChargeCard extends HTMLElement {
           from="${fromOffset}" to="${toOffset}" dur="1.2s" repeatCount="indefinite"/>
       </path>
       ${label ? `<title>${label}</title>` : ""}`;
+  }
+
+  // ── EV 7-day history strip ────────────────────────────────────────────
+
+  private _renderEvWeek(ent: Record<FlowEntityKey, string | undefined>): string {
+    const totals = this._s(ent.evEnergyToday)?.attributes?.daily_totals as
+      Record<string, number> | undefined;
+
+    const days: { date: string; kwh: number; label: string }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const kwh = Number(totals?.[iso] ?? 0);
+      days.push({
+        date: iso,
+        kwh: Number.isFinite(kwh) ? kwh : 0,
+        label: ["S", "M", "T", "W", "T", "F", "S"][d.getDay()],
+      });
+    }
+
+    const max = Math.max(...days.map((d) => d.kwh), 1);
+    return `
+    <div class="ev-week">
+      ${days.map((d, i) => `
+        <div class="ev-day" title="${d.date}: ${d.kwh.toFixed(1)} kWh">
+          <span class="ev-day-val">${d.kwh >= 0.05 ? d.kwh.toFixed(1) : ""}</span>
+          <div class="ev-day-bar">
+            <div class="ev-day-fill ${d.kwh >= 0.05 ? "" : "empty"} ${i === 6 ? "today" : ""}"
+              style="height:${Math.max(4, (d.kwh / max) * 100).toFixed(1)}%"></div>
+          </div>
+          <span class="ev-day-lbl ${i === 6 ? "today" : ""}">${d.label}</span>
+        </div>`).join("")}
+    </div>`;
   }
 
   // ── Node icons ────────────────────────────────────────────────────────
@@ -915,6 +1010,44 @@ strong { display: block; font-size: 0.95rem; line-height: 1.25; overflow-wrap: a
 }
 .metric strong { font-size: 1.15rem; font-weight: 720; }
 .metric small  { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--secondary-text-color,#667085); }
+
+/* Stale-charge warning banner */
+.stale-banner {
+  padding: 9px 16px;
+  background: rgba(245,158,11,.14);
+  border-top: 1px solid rgba(245,158,11,.4);
+  border-bottom: 1px solid rgba(245,158,11,.4);
+  color: #b45309;
+  font-size: 0.85rem; font-weight: 700; line-height: 1.3;
+}
+
+/* EV charge history */
+.ev-history {
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--divider-color,rgba(127,127,127,.18));
+}
+.ev-stats {
+  display: grid; grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 8px; margin-bottom: 10px;
+}
+.warn-text { color: #b45309; }
+.ev-week {
+  display: grid; grid-template-columns: repeat(7, minmax(0,1fr));
+  gap: 6px; align-items: end;
+}
+.ev-day { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ev-day-val { font-size: 0.62rem; font-weight: 700; color: var(--secondary-text-color,#667085); min-height: 12px; }
+.ev-day-bar {
+  width: 100%; max-width: 34px; height: 44px;
+  display: flex; align-items: flex-end;
+  background: color-mix(in srgb, var(--divider-color,rgba(127,127,127,.18)) 50%, transparent);
+  border-radius: 5px; overflow: hidden;
+}
+.ev-day-fill { width: 100%; background: #a855f7; border-radius: 5px 5px 0 0; }
+.ev-day-fill.empty { background: var(--divider-color,rgba(127,127,127,.3)); }
+.ev-day-fill.today { background: #7c3aed; }
+.ev-day-lbl { font-size: 0.64rem; font-weight: 700; color: var(--secondary-text-color,#667085); }
+.ev-day-lbl.today { color: var(--primary-text-color,#1f2933); }
 
 /* Reason */
 .reason-row {

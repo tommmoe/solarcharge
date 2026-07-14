@@ -76,6 +76,7 @@ from .inverter_schedule import (
     current_slot_index,
 )
 from .overnight_tracker import OvernightTracker
+from .session_tracker import ChargeSessionTracker
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entry.entry_id,
             float(self._settings.get(CONF_BATTERY_CAPACITY_KWH, 48.0)),
         )
+        self.session_tracker = ChargeSessionTracker(hass, entry.entry_id)
 
     @property
     def title(self) -> str:
@@ -126,6 +128,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_config_entry_first_refresh(self) -> None:
         """Load persisted overnight data before first update cycle."""
         await self.overnight_tracker.async_load()
+        await self.session_tracker.async_load()
         await super().async_config_entry_first_refresh()
 
     def refresh_settings(self) -> None:
@@ -286,6 +289,32 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.controller.async_apply_decision(data=data)
             data["last_control_action"] = self.controller.last_action
             data["last_error"] = self.last_error
+
+            # ── Charge session tracking ───────────────────────────────
+            self.session_tracker.update(now=now, charger_power_w=charger_power_w)
+            engine = self.session_tracker.engine
+            today = now.date().isoformat()
+            last_session = engine.last_session
+            last_charged_iso = engine.last_charged
+            data.update(
+                {
+                    "ev_charging": engine.charging_active,
+                    "ev_energy_today_kwh": engine.energy_today_kwh(today),
+                    "ev_last_session_energy_kwh": (
+                        round(last_session.energy_kwh, 3) if last_session else None
+                    ),
+                    "ev_last_charged": (
+                        dt_util.parse_datetime(last_charged_iso)
+                        if last_charged_iso
+                        else None
+                    ),
+                    "ev_session_count_today": engine.session_count_today(today),
+                    "ev_daily_totals": engine.recent_daily_totals(7),
+                    "ev_sessions": [
+                        s.as_dict() for s in reversed(engine.sessions[-10:])
+                    ],
+                }
+            )
 
             # ── Overnight tracker update ──────────────────────────────
             self.overnight_tracker.update(

@@ -26,6 +26,7 @@ class SolarChargeSensorDescription(SensorEntityDescription):
     """Description for a Solar Charge sensor."""
 
     value_fn: Callable[[dict[str, Any]], Any]
+    attributes_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
 SENSORS: tuple[SolarChargeSensorDescription, ...] = (
@@ -182,6 +183,33 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("current_inverter_slot"),
     ),
+    # ── EV charge session tracking ───────────────────────────────────────
+    SolarChargeSensorDescription(
+        key="ev_energy_today",
+        translation_key="ev_energy_today",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda data: data.get("ev_energy_today_kwh"),
+        attributes_fn=lambda data: {
+            "daily_totals": data.get("ev_daily_totals"),
+            "sessions_today": data.get("ev_session_count_today"),
+        },
+    ),
+    SolarChargeSensorDescription(
+        key="ev_last_session_energy",
+        translation_key="ev_last_session_energy",
+        native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
+        device_class=SensorDeviceClass.ENERGY,
+        value_fn=lambda data: data.get("ev_last_session_energy_kwh"),
+        attributes_fn=lambda data: {"sessions": data.get("ev_sessions")},
+    ),
+    SolarChargeSensorDescription(
+        key="ev_last_charged",
+        translation_key="ev_last_charged",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda data: data.get("ev_last_charged"),
+    ),
 )
 
 
@@ -226,4 +254,12 @@ class SolarChargeSensor(CoordinatorEntity[SolarChargeCoordinator], SensorEntity)
         if not self.coordinator.data:
             return None
         return self.entity_description.value_fn(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra attributes when the description provides them."""
+
+        if not self.coordinator.data or self.entity_description.attributes_fn is None:
+            return None
+        return self.entity_description.attributes_fn(self.coordinator.data)
 
