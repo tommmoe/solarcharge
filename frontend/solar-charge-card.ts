@@ -234,10 +234,30 @@ class SolarChargeCard extends HTMLElement {
     const out = {} as Record<FlowEntityKey, string | undefined>;
     for (const key of Object.keys(FLOW_SUFFIXES) as FlowEntityKey[]) {
       const [domain, suffix] = FLOW_SUFFIXES[key];
-      out[key] = cfg[key] ?? (base ? `${domain}.${base}_${suffix}` : undefined);
+      const inferred = base ? `${domain}.${base}_${suffix}` : undefined;
+      out[key] = cfg[key] ?? this._resolveGeneratedEntity(domain, suffix, inferred);
     }
     if (this._config?.entity) out.status = cfg.status ?? this._config.entity;
     return out;
+  }
+
+  private _resolveGeneratedEntity(
+    domain: string,
+    suffix: string,
+    inferred: string | undefined,
+  ): string | undefined {
+    // HA keeps existing entity IDs when an integration/device is renamed. New
+    // entities can therefore receive the new prefix while older entities retain
+    // the prefix used by the configured status sensor. Prefer the conventional
+    // ID, then use an unambiguous generated suffix match as a safe fallback.
+    if (!this._hass || !inferred || this._hass.states[inferred]) return inferred;
+
+    const ending = `_${suffix}`;
+    const matches = Object.keys(this._hass.states).filter((entityId) => {
+      const [candidateDomain, objectId] = entityId.split(".", 2);
+      return candidateDomain === domain && objectId?.endsWith(ending);
+    });
+    return matches.length === 1 ? matches[0] : inferred;
   }
 
   private _s(id?: string): EntityState | undefined {

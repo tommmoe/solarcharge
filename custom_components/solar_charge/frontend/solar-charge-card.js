@@ -46,7 +46,7 @@ function D(o) {
   const e = new Date(o).getTime();
   return Number.isFinite(e) ? (Date.now() - e) / 36e5 : null;
 }
-const T = {
+const W = {
   status: ["sensor", "status"],
   reason: ["sensor", "reason"],
   gridImport: ["sensor", "grid_import"],
@@ -95,7 +95,7 @@ const T = {
 function R(o) {
   return C.find((e) => o >= e.start && o < e.end) ?? C[0];
 }
-const W = {
+const T = {
   solar: [104, 52],
   grid: [256, 52],
   home: [180, 150],
@@ -111,8 +111,8 @@ const W = {
   battery: 25
 };
 function A(o, e) {
-  const t = W[o], r = W[e], s = r[0] - t[0], a = r[1] - t[1], n = Math.hypot(s, a) || 1, i = s / n, l = a / n, p = t[0] + i * E[o], d = t[1] + l * E[o], g = r[0] - i * E[e], h = r[1] - l * E[e], c = (p + g) / 2, m = (d + h) / 2, x = n * 0.05 * (c < 180 ? -1 : c > 180 ? 1 : 0), w = c + -l * x, f = m + i * x;
-  return `M ${p.toFixed(1)} ${d.toFixed(1)} Q ${w.toFixed(1)} ${f.toFixed(1)} ${g.toFixed(1)} ${h.toFixed(1)}`;
+  const t = T[o], r = T[e], a = r[0] - t[0], s = r[1] - t[1], l = Math.hypot(a, s) || 1, i = a / l, n = s / l, c = t[0] + i * E[o], d = t[1] + n * E[o], h = r[0] - i * E[e], g = r[1] - n * E[e], p = (c + h) / 2, m = (d + g) / 2, x = l * 0.05 * (p < 180 ? -1 : p > 180 ? 1 : 0), w = p + -n * x, f = m + i * x;
+  return `M ${c.toFixed(1)} ${d.toFixed(1)} Q ${w.toFixed(1)} ${f.toFixed(1)} ${h.toFixed(1)} ${g.toFixed(1)}`;
 }
 class B extends HTMLElement {
   constructor() {
@@ -134,18 +134,26 @@ class B extends HTMLElement {
     return { type: "custom:solar-charge-card", entity: "sensor.solar_charge_status", title: "Solar Charge" };
   }
   _baseId() {
-    var t, r, s, a;
-    const e = (a = ((r = (t = this._config) == null ? void 0 : t.entities) == null ? void 0 : r.status) ?? ((s = this._config) == null ? void 0 : s.entity)) == null ? void 0 : a.split(".")[1];
+    var t, r, a, s;
+    const e = (s = ((r = (t = this._config) == null ? void 0 : t.entities) == null ? void 0 : r.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : s.split(".")[1];
     return e != null && e.endsWith("_status") ? e.slice(0, -7) : e;
   }
   _ent() {
-    var s, a;
-    const e = ((s = this._config) == null ? void 0 : s.entities) ?? {}, t = this._baseId(), r = {};
-    for (const n of Object.keys(T)) {
-      const [i, l] = T[n];
-      r[n] = e[n] ?? (t ? `${i}.${t}_${l}` : void 0);
+    var a, s;
+    const e = ((a = this._config) == null ? void 0 : a.entities) ?? {}, t = this._baseId(), r = {};
+    for (const l of Object.keys(W)) {
+      const [i, n] = W[l], c = t ? `${i}.${t}_${n}` : void 0;
+      r[l] = e[l] ?? this._resolveGeneratedEntity(i, n, c);
     }
-    return (a = this._config) != null && a.entity && (r.status = e.status ?? this._config.entity), r;
+    return (s = this._config) != null && s.entity && (r.status = e.status ?? this._config.entity), r;
+  }
+  _resolveGeneratedEntity(e, t, r) {
+    if (!this._hass || !r || this._hass.states[r]) return r;
+    const a = `_${t}`, s = Object.keys(this._hass.states).filter((l) => {
+      const [i, n] = l.split(".", 2);
+      return i === e && (n == null ? void 0 : n.endsWith(a));
+    });
+    return s.length === 1 ? s[0] : r;
   }
   _s(e) {
     var t;
@@ -153,7 +161,7 @@ class B extends HTMLElement {
   }
   async _handleClick(e) {
     const t = e.composedPath().find(
-      (s) => s instanceof HTMLElement && s.dataset.action
+      (a) => a instanceof HTMLElement && a.dataset.action
     );
     if (!t || !this._hass) return;
     const r = this._ent();
@@ -163,8 +171,8 @@ class B extends HTMLElement {
         option: t.dataset.option
       });
     else if (t.dataset.action === "toggle-control" && r.controlEnabled) {
-      const s = v(this._s(r.controlEnabled));
-      await this._hass.callService("switch", s ? "turn_off" : "turn_on", {
+      const a = v(this._s(r.controlEnabled));
+      await this._hass.callService("switch", a ? "turn_off" : "turn_on", {
         entity_id: r.controlEnabled
       });
     }
@@ -172,7 +180,7 @@ class B extends HTMLElement {
   _render() {
     var M, I, L;
     if (!this.shadowRoot || !this._config) return;
-    const e = this._ent(), t = F(this._s(e.status)), r = v(this._s(e.allowedToCharge)), s = v(this._s(e.controlEnabled)), a = v(this._s(e.gridSensorOk)) && v(this._s(e.chargerSensorOk)) && v(this._s(e.breakerLimitOk)), n = F(this._s(e.mode)), i = F(this._s(e.chargerStatus)), l = this._carConnected(i), p = this._config.show_controls !== !1, d = a ? r ? "active" : "idle" : "danger", g = /* @__PURE__ */ new Date(), h = g.getHours() + g.getMinutes() / 60, c = R(h), m = h >= 18 && h < 21, x = m && v(this._s(e.zeroheroEligible)), w = v(this._s(e.evCharging)), f = (M = this._s(e.evLastCharged)) == null ? void 0 : M.state, y = !!f && f !== "unknown" && f !== "unavailable", _ = y ? D(f) : null, k = l && !w && (!y || _ != null && _ >= 24);
+    const e = this._ent(), t = F(this._s(e.status)), r = v(this._s(e.allowedToCharge)), a = v(this._s(e.controlEnabled)), s = v(this._s(e.gridSensorOk)) && v(this._s(e.chargerSensorOk)) && v(this._s(e.breakerLimitOk)), l = F(this._s(e.mode)), i = F(this._s(e.chargerStatus)), n = this._carConnected(i), c = this._config.show_controls !== !1, d = s ? r ? "active" : "idle" : "danger", h = /* @__PURE__ */ new Date(), g = h.getHours() + h.getMinutes() / 60, p = R(g), m = g >= 18 && g < 21, x = m && v(this._s(e.zeroheroEligible)), w = v(this._s(e.evCharging)), f = (M = this._s(e.evLastCharged)) == null ? void 0 : M.state, y = !!f && f !== "unknown" && f !== "unavailable", _ = y ? D(f) : null, k = n && !w && (!y || _ != null && _ >= 24);
     this.shadowRoot.innerHTML = `
       <style>${q}</style>
       <article class="card ${d}">
@@ -187,11 +195,11 @@ class B extends HTMLElement {
               <div class="zerohero-badge ${x ? "ok" : "risk"}">
                 ${x ? "✓" : "⚠"} ZeroHero
               </div>` : ""}
-            <div class="period-badge" style="background:${c.color}20;color:${c.color};border-color:${c.color}40">
-              ${b(c.label)} · ${b(c.cost)}
+            <div class="period-badge" style="background:${p.color}20;color:${p.color};border-color:${p.color}40">
+              ${b(p.label)} · ${b(p.cost)}
             </div>
             <div class="status-pill ${d}">
-              <span></span>${r ? "Charging" : a ? "Waiting" : "Check"}
+              <span></span>${r ? "Charging" : s ? "Waiting" : "Check"}
             </div>
           </div>
         </header>
@@ -206,9 +214,9 @@ class B extends HTMLElement {
         </section>
 
         <section class="info-row">
-          <div><span class="lbl">Mode</span><strong>${b(n)}</strong></div>
-          <div><span class="lbl">Control</span><strong>${s ? "On" : "Off"}</strong></div>
-          <div><span class="lbl">Car</span><strong>${l ? "Connected" : "Away"}</strong></div>
+          <div><span class="lbl">Mode</span><strong>${b(l)}</strong></div>
+          <div><span class="lbl">Control</span><strong>${a ? "On" : "Off"}</strong></div>
+          <div><span class="lbl">Car</span><strong>${n ? "Connected" : "Away"}</strong></div>
           <div><span class="lbl">Free window</span><strong>${v(this._s(e.inFreeWindow)) ? "Active ☀️" : "—"}</strong></div>
         </section>
 
@@ -253,18 +261,18 @@ class B extends HTMLElement {
           ${this._safetyItem("Free window", v(this._s(e.inFreeWindow)))}
         </section>
 
-        ${p ? `
+        ${c ? `
           <section class="controls-row">
             <div class="mode-buttons">
               ${j.map((z) => `
-                <button class="${n === z.option ? "sel" : ""}"
+                <button class="${l === z.option ? "sel" : ""}"
                   data-action="mode" data-option="${z.option}" type="button">
                   ${z.label}
                 </button>`).join("")}
             </div>
-            <button class="ctrl-toggle ${s ? "on" : ""}"
+            <button class="ctrl-toggle ${a ? "on" : ""}"
               data-action="toggle-control" type="button">
-              ${s ? "Disable" : "Enable"} control
+              ${a ? "Disable" : "Enable"} control
             </button>
           </section>` : ""}
 
@@ -272,7 +280,7 @@ class B extends HTMLElement {
   }
   // ── Power flow diagram ────────────────────────────────────────────────
   _renderFlow(e) {
-    const t = u(this._s(e.pvPower)), r = u(this._s(e.gridImport)), s = u(this._s(e.batteryPower)), a = u(this._s(e.chargerPower)), n = u(this._s(e.loadPower)), i = u(this._s(e.batterySoc)), l = t > 50, p = r > 50, d = r < -50, g = s > 50, h = s < -50, c = a > 50, m = n > 50, x = "#f59e0b", w = d ? "#22c55e" : "#ef4444", f = g ? "#3b82f6" : h ? "#f59e0b" : "#6b7280", y = "#a855f7", _ = "#64748b";
+    const t = u(this._s(e.pvPower)), r = u(this._s(e.gridImport)), a = u(this._s(e.batteryPower)), s = u(this._s(e.chargerPower)), l = u(this._s(e.loadPower)), i = u(this._s(e.batterySoc)), n = t > 50, c = r > 50, d = r < -50, h = a > 50, g = a < -50, p = s > 50, m = l > 50, x = "#f59e0b", w = d ? "#22c55e" : "#ef4444", f = h ? "#3b82f6" : g ? "#f59e0b" : "#6b7280", y = "#a855f7", _ = "#64748b";
     return `
     <div class="flow-wrap">
       <svg class="flow-svg" viewBox="0 0 360 300" preserveAspectRatio="xMidYMid meet">
@@ -282,19 +290,19 @@ class B extends HTMLElement {
             <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
           </filter>
         </defs>
-        ${this._flowEdge("solar", "home", l, x, !1)}
-        ${this._flowEdge("grid", "home", p || d, w, d)}
-        ${this._flowEdge("home", "battery", g || h, f, h)}
-        ${this._flowEdge("home", "ev", c, y, !1)}
+        ${this._flowEdge("solar", "home", n, x, !1)}
+        ${this._flowEdge("grid", "home", c || d, w, d)}
+        ${this._flowEdge("home", "battery", h || g, f, g)}
+        ${this._flowEdge("home", "ev", p, y, !1)}
         ${this._flowEdge("home", "load", m, _, !1)}
       </svg>
 
-      <div class="node solar ${l ? "on" : ""}" style="--nc:${x}">
+      <div class="node solar ${n ? "on" : ""}" style="--nc:${x}">
         ${this._solarIcon()}
         <div class="ntext"><div class="nval">${$(this._s(e.pvPower))}</div><div class="nlbl">Solar</div></div>
       </div>
 
-      <div class="node grid ${p || d ? "on" : ""}" style="--nc:${w}">
+      <div class="node grid ${c || d ? "on" : ""}" style="--nc:${w}">
         ${this._gridIcon()}
         <div class="ntext"><div class="nval">${$(this._s(e.gridImport))}</div><div class="nlbl">${d ? "Export" : "Grid"}</div></div>
       </div>
@@ -303,13 +311,13 @@ class B extends HTMLElement {
         ${this._homeIcon()}
       </div>
 
-      <div class="node battery ${g || h ? "on" : ""}" style="--nc:${f}">
-        ${this._batteryRing(i, g, h)}
+      <div class="node battery ${h || g ? "on" : ""}" style="--nc:${f}">
+        ${this._batteryRing(i, h, g)}
         <div class="ntext"><div class="nval">${$(this._s(e.batteryPower))}</div><div class="nlbl">Battery</div></div>
       </div>
 
-      <div class="node ev ${c ? "on" : ""}" style="--nc:${y}">
-        ${this._evIcon(c)}
+      <div class="node ev ${p ? "on" : ""}" style="--nc:${y}">
+        ${this._evIcon(p)}
         <div class="ntext"><div class="nval">${$(this._s(e.chargerPower))}</div><div class="nlbl">EV</div></div>
       </div>
 
@@ -319,39 +327,39 @@ class B extends HTMLElement {
       </div>
     </div>`;
   }
-  _flowEdge(e, t, r, s, a) {
-    const n = A(e, t);
+  _flowEdge(e, t, r, a, s) {
+    const l = A(e, t);
     return r ? `
-      <path d="${n}" fill="none" stroke="${s}" stroke-width="3" stroke-opacity="0.5" stroke-linecap="round"/>
-      <circle class="flow-dot" r="3.8" fill="${s}" filter="url(#sc-glow)">
-        <animateMotion dur="2s" repeatCount="indefinite" path="${n}" ${a ? 'keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : ""}/>
-      </circle>` : `<path d="${n}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.22))" stroke-width="2.5" stroke-linecap="round"/>`;
+      <path d="${l}" fill="none" stroke="${a}" stroke-width="3" stroke-opacity="0.5" stroke-linecap="round"/>
+      <circle class="flow-dot" r="3.8" fill="${a}" filter="url(#sc-glow)">
+        <animateMotion dur="2s" repeatCount="indefinite" path="${l}" ${s ? 'keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : ""}/>
+      </circle>` : `<path d="${l}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.22))" stroke-width="2.5" stroke-linecap="round"/>`;
   }
   // ── EV 7-day history strip ────────────────────────────────────────────
   _renderEvWeek(e) {
-    var a, n;
-    const t = (n = (a = this._s(e.evEnergyToday)) == null ? void 0 : a.attributes) == null ? void 0 : n.daily_totals, r = [];
+    var s, l;
+    const t = (l = (s = this._s(e.evEnergyToday)) == null ? void 0 : s.attributes) == null ? void 0 : l.daily_totals, r = [];
     for (let i = 6; i >= 0; i--) {
-      const l = /* @__PURE__ */ new Date();
-      l.setDate(l.getDate() - i);
-      const p = `${l.getFullYear()}-${String(l.getMonth() + 1).padStart(2, "0")}-${String(l.getDate()).padStart(2, "0")}`, d = Number((t == null ? void 0 : t[p]) ?? 0);
+      const n = /* @__PURE__ */ new Date();
+      n.setDate(n.getDate() - i);
+      const c = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`, d = Number((t == null ? void 0 : t[c]) ?? 0);
       r.push({
-        date: p,
+        date: c,
         kwh: Number.isFinite(d) ? d : 0,
-        label: ["S", "M", "T", "W", "T", "F", "S"][l.getDay()]
+        label: ["S", "M", "T", "W", "T", "F", "S"][n.getDay()]
       });
     }
-    const s = Math.max(...r.map((i) => i.kwh), 1);
+    const a = Math.max(...r.map((i) => i.kwh), 1);
     return `
     <div class="ev-week">
-      ${r.map((i, l) => `
+      ${r.map((i, n) => `
         <div class="ev-day" title="${i.date}: ${i.kwh.toFixed(1)} kWh">
           <span class="ev-day-val">${i.kwh >= 0.05 ? i.kwh.toFixed(1) : ""}</span>
           <div class="ev-day-bar">
-            <div class="ev-day-fill ${i.kwh >= 0.05 ? "" : "empty"} ${l === 6 ? "today" : ""}"
-              style="height:${Math.max(4, i.kwh / s * 100).toFixed(1)}%"></div>
+            <div class="ev-day-fill ${i.kwh >= 0.05 ? "" : "empty"} ${n === 6 ? "today" : ""}"
+              style="height:${Math.max(4, i.kwh / a * 100).toFixed(1)}%"></div>
           </div>
-          <span class="ev-day-lbl ${l === 6 ? "today" : ""}">${i.label}</span>
+          <span class="ev-day-lbl ${n === 6 ? "today" : ""}">${i.label}</span>
         </div>`).join("")}
     </div>`;
   }
@@ -389,17 +397,17 @@ class B extends HTMLElement {
     </svg>`;
   }
   _batteryRing(e, t, r) {
-    const i = 2 * Math.PI * 22, l = e / 100 * i, p = t ? "#3b82f6" : r ? "#f59e0b" : e > 50 ? "#22c55e" : e > 20 ? "#f59e0b" : "#ef4444";
+    const i = 2 * Math.PI * 22, n = e / 100 * i, c = t ? "#3b82f6" : r ? "#f59e0b" : e > 50 ? "#22c55e" : e > 20 ? "#f59e0b" : "#ef4444";
     return `
     <svg class="bat-ring" viewBox="0 0 56 56">
       <circle cx="28" cy="28" r="22" fill="none"
         stroke="var(--divider-color,rgba(127,127,127,0.18))" stroke-width="5"/>
       <circle cx="28" cy="28" r="22" fill="none"
-        stroke="${p}" stroke-width="5" stroke-linecap="round"
-        stroke-dasharray="${l.toFixed(1)} ${i.toFixed(1)}"
+        stroke="${c}" stroke-width="5" stroke-linecap="round"
+        stroke-dasharray="${n.toFixed(1)} ${i.toFixed(1)}"
         transform="rotate(-90 28 28)"/>
       <text x="28" y="33" text-anchor="middle"
-        font-size="15" font-weight="700" fill="${p}" stroke="none">${Math.round(e)}</text>
+        font-size="15" font-weight="700" fill="${c}" stroke="none">${Math.round(e)}</text>
     </svg>`;
   }
   _evIcon(e) {
@@ -457,18 +465,18 @@ class V extends HTMLElement {
     return { type: "custom:solar-charge-tariff-card", entity: "sensor.solar_charge_status" };
   }
   _baseId() {
-    var t, r, s, a;
-    const e = (a = ((r = (t = this._config) == null ? void 0 : t.entities) == null ? void 0 : r.status) ?? ((s = this._config) == null ? void 0 : s.entity)) == null ? void 0 : a.split(".")[1];
+    var t, r, a, s;
+    const e = (s = ((r = (t = this._config) == null ? void 0 : t.entities) == null ? void 0 : r.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : s.split(".")[1];
     return e != null && e.endsWith("_status") ? e.slice(0, -7) : e;
   }
   _ent() {
-    var s, a;
-    const e = ((s = this._config) == null ? void 0 : s.entities) ?? {}, t = this._baseId(), r = {};
-    for (const n of Object.keys(N)) {
-      const [i, l] = N[n];
-      r[n] = e[n] ?? (t ? `${i}.${t}_${l}` : void 0);
+    var a, s;
+    const e = ((a = this._config) == null ? void 0 : a.entities) ?? {}, t = this._baseId(), r = {};
+    for (const l of Object.keys(N)) {
+      const [i, n] = N[l];
+      r[l] = e[l] ?? (t ? `${i}.${t}_${n}` : void 0);
     }
-    return (a = this._config) != null && a.entity && (r.status = e.status ?? this._config.entity), r;
+    return (s = this._config) != null && s.entity && (r.status = e.status ?? this._config.entity), r;
   }
   _s(e) {
     var t;
@@ -477,15 +485,15 @@ class V extends HTMLElement {
   _render() {
     var y, _;
     if (!this.shadowRoot || !this._config) return;
-    const e = this._ent(), t = /* @__PURE__ */ new Date(), r = t.getHours() + t.getMinutes() / 60, s = R(r), a = this._config.battery_capacity_kwh ?? 48, n = v(this._s(e.zeroheroEligible)), i = u(this._s(e.zeroheroImportKwh)), l = u(this._s(e.superExportKwh)), p = u(this._s(e.overnightAvgConsumption)) || null, d = u(this._s(e.overnightReservePct)), g = u(this._s(e.overnightSnapshotCount)), h = u(this._s(e.currentInverterSlot)) || 0, c = u(this._s(e.batterySoc)), m = r >= 18 && r < 21, x = ((y = C.find((k) => k.start > r)) == null ? void 0 : y.start) ?? C[0].start + 24, w = Math.round((x - r) * 60), f = ((_ = C.find((k) => k.start === x % 24)) == null ? void 0 : _.label) ?? "";
+    const e = this._ent(), t = /* @__PURE__ */ new Date(), r = t.getHours() + t.getMinutes() / 60, a = R(r), s = this._config.battery_capacity_kwh ?? 48, l = v(this._s(e.zeroheroEligible)), i = u(this._s(e.zeroheroImportKwh)), n = u(this._s(e.superExportKwh)), c = u(this._s(e.overnightAvgConsumption)) || null, d = u(this._s(e.overnightReservePct)), h = u(this._s(e.overnightSnapshotCount)), g = u(this._s(e.currentInverterSlot)) || 0, p = u(this._s(e.batterySoc)), m = r >= 18 && r < 21, x = ((y = C.find((k) => k.start > r)) == null ? void 0 : y.start) ?? C[0].start + 24, w = Math.round((x - r) * 60), f = ((_ = C.find((k) => k.start === x % 24)) == null ? void 0 : _.label) ?? "";
     this.shadowRoot.innerHTML = `
-      <style>${K}</style>
+      <style>${G}</style>
       <article class="card">
 
         <header class="t-header">
           <h2>${b(this._config.title ?? "Energy Schedule")}</h2>
-          <div class="current-period" style="color:${s.color}">
-            ${b(s.label)} &nbsp;·&nbsp; ${b(s.cost)}/kWh
+          <div class="current-period" style="color:${a.color}">
+            ${b(a.label)} &nbsp;·&nbsp; ${b(a.cost)}/kWh
           </div>
         </header>
 
@@ -500,19 +508,19 @@ class V extends HTMLElement {
         <section class="two-col">
 
           <!-- ZeroHero -->
-          <div class="panel ${m ? n ? "panel-ok" : "panel-warn" : "panel-dim"}">
+          <div class="panel ${m ? l ? "panel-ok" : "panel-warn" : "panel-dim"}">
             <div class="panel-title">🏆 ZeroHero Credit</div>
             <div class="panel-sub">$1/day if imports ≤ 0.09 kWh (6pm–9pm)</div>
             ${m ? `
               <div class="bar-wrap">
                 <div class="bar-track">
-                  <div class="bar-fill ${n ? "green" : "red"}"
+                  <div class="bar-fill ${l ? "green" : "red"}"
                     style="width:${Math.min(100, i / 0.09 * 100).toFixed(1)}%"></div>
                 </div>
                 <span class="bar-val">${i.toFixed(3)} / 0.09 kWh</span>
               </div>
-              <div class="panel-status ${n ? "ok" : "bad"}">
-                ${n ? "✓ On track" : "✗ Limit exceeded"}
+              <div class="panel-status ${l ? "ok" : "bad"}">
+                ${l ? "✓ On track" : "✗ Limit exceeded"}
               </div>` : r >= 21 ? '<div class="panel-status dim">Window closed</div>' : `<div class="panel-status dim">Window starts ${21 - Math.ceil(r)}h ${r < 18 ? Math.round((18 - r) * 60) + "m" : ""}~</div>`}
           </div>
 
@@ -520,16 +528,16 @@ class V extends HTMLElement {
           <div class="panel ${m ? "panel-purple" : "panel-dim"}">
             <div class="panel-title">⚡ Super Export</div>
             <div class="panel-sub">15c/kWh on first 15 kWh (6pm–9pm)</div>
-            ${m || l > 0 ? `
+            ${m || n > 0 ? `
               <div class="bar-wrap">
                 <div class="bar-track">
                   <div class="bar-fill purple"
-                    style="width:${Math.min(100, l / 15 * 100).toFixed(1)}%"></div>
+                    style="width:${Math.min(100, n / 15 * 100).toFixed(1)}%"></div>
                 </div>
-                <span class="bar-val">${l.toFixed(2)} / 15 kWh</span>
+                <span class="bar-val">${n.toFixed(2)} / 15 kWh</span>
               </div>
               <div class="panel-status purple">
-                ≈ $${(l * 0.2).toFixed(2)} earned
+                ≈ $${(n * 0.2).toFixed(2)} earned
               </div>` : `<div class="panel-status dim">${r < 18 ? "Starts at 6pm" : "No data yet"}</div>`}
           </div>
 
@@ -539,47 +547,47 @@ class V extends HTMLElement {
           <div class="panel-title">🔋 Overnight Reserve</div>
           <div class="overnight-grid">
             <div class="ov-stat">
-              <span class="ov-val">${p != null ? S(p) : "—"}</span>
+              <span class="ov-val">${c != null ? S(c) : "—"}</span>
               <span class="ov-lbl">Avg overnight use</span>
-              <span class="ov-sub">${g} day${g !== 1 ? "s" : ""} of data</span>
+              <span class="ov-sub">${h} day${h !== 1 ? "s" : ""} of data</span>
             </div>
             <div class="ov-stat">
               <span class="ov-val">${d ? d + "%" : "—"}</span>
               <span class="ov-lbl">Reserve target</span>
-              <span class="ov-sub">≈ ${d ? S(d / 100 * a) : "—"}</span>
+              <span class="ov-sub">≈ ${d ? S(d / 100 * s) : "—"}</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${c ? Math.round(c) + "%" : "—"}</span>
+              <span class="ov-val">${p ? Math.round(p) + "%" : "—"}</span>
               <span class="ov-lbl">Current SOC</span>
-              <span class="ov-sub">≈ ${S(c / 100 * a)}</span>
+              <span class="ov-sub">≈ ${S(p / 100 * s)}</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${h ? `Slot ${h}` : "—"}</span>
+              <span class="ov-val">${g ? `Slot ${g}` : "—"}</span>
               <span class="ov-lbl">Active slot</span>
-              <span class="ov-sub">${this._slotLabel(h)}</span>
+              <span class="ov-sub">${this._slotLabel(g)}</span>
             </div>
           </div>
-          ${g < 3 ? `<p class="data-notice">Collecting data — ${3 - g} more night${3 - g !== 1 ? "s" : ""} needed for smart reserve.</p>` : ""}
+          ${h < 3 ? `<p class="data-notice">Collecting data — ${3 - h} more night${3 - h !== 1 ? "s" : ""} needed for smart reserve.</p>` : ""}
         </section>
 
       </article>`;
   }
   _renderTimeline(e) {
-    const r = C.map((a) => {
-      const n = (a.end - a.start) / 24 * 100;
-      return a.start / 24 * 100, `<div class="t-bar" title="${a.label} ${a.cost}"
-        style="width:${n.toFixed(2)}%;background:${a.color};opacity:0.85"></div>`;
-    }).join(""), s = e / 24 * 100;
+    const r = C.map((s) => {
+      const l = (s.end - s.start) / 24 * 100;
+      return s.start / 24 * 100, `<div class="t-bar" title="${s.label} ${s.cost}"
+        style="width:${l.toFixed(2)}%;background:${s.color};opacity:0.85"></div>`;
+    }).join(""), a = e / 24 * 100;
     return `
     <div class="timeline">
       <div class="t-bars">${r}</div>
-      <div class="t-now" style="left:${s.toFixed(2)}%">
+      <div class="t-now" style="left:${a.toFixed(2)}%">
         <div class="t-now-line"></div>
         <div class="t-now-label">Now</div>
       </div>
       <div class="t-labels">
         ${[0, 4, 8, 11, 14, 16, 18, 21, 24].map(
-      (a) => `<span style="left:${(a / 24 * 100).toFixed(1)}%">${a === 24 ? "0" : a}</span>`
+      (s) => `<span style="left:${(s / 24 * 100).toFixed(1)}%">${s === 24 ? "0" : s}</span>`
     ).join("")}
       </div>
     </div>`;
@@ -824,7 +832,7 @@ button.sel, .ctrl-toggle.on {
   .mode-buttons { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .header-right { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
 }
-`, K = `
+`, G = `
 :host { display: block; color: var(--primary-text-color, #1f2933); }
 
 .card {
