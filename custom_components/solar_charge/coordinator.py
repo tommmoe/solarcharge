@@ -404,8 +404,8 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             current_change_threshold_amps=int(
                 float(self._settings[CONF_CURRENT_CHANGE_THRESHOLD_AMPS])
             ),
-            free_window_start=_parse_time(str(self._settings[CONF_FREE_WINDOW_START])),
-            free_window_end=_parse_time(str(self._settings[CONF_FREE_WINDOW_END])),
+            free_window_start=_parse_time(self._settings[CONF_FREE_WINDOW_START]),
+            free_window_end=_parse_time(self._settings[CONF_FREE_WINDOW_END]),
             mode=str(self._settings[CONF_MODE]),
             battery_reserve_pct=_optional_float(
                 self._settings.get(CONF_BATTERY_RESERVE_PCT)

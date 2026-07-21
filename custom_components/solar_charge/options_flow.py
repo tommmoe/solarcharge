@@ -96,23 +96,21 @@ def _number_default(raw: Any, fallback: float | int) -> float:
     return float(raw)
 
 
-def _time_selector_default(raw: Any) -> dict[str, int]:
-    """TimeSelector defaults must use hours/minutes/seconds dicts, not \"HH:MM\" strings."""
+def _time_selector_default(raw: Any) -> str:
+    """Return the string format expected by Home Assistant's TimeSelector."""
 
     if isinstance(raw, dict):
-        return {
-            "hours": int(raw.get("hours", 0)),
-            "minutes": int(raw.get("minutes", 0)),
-            "seconds": int(raw.get("seconds", 0)),
-        }
+        hours = int(raw.get("hours", 0))
+        minutes = int(raw.get("minutes", 0))
+        seconds = int(raw.get("seconds", 0))
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
     if isinstance(raw, str) and ":" in raw:
         parts = raw.split(":")
-        return {
-            "hours": int(parts[0]),
-            "minutes": int(parts[1]) if len(parts) > 1 else 0,
-            "seconds": int(parts[2]) if len(parts) > 2 else 0,
-        }
-    return {"hours": 0, "minutes": 0, "seconds": 0}
+        hours = int(parts[0])
+        minutes = int(parts[1]) if len(parts) > 1 else 0
+        seconds = int(parts[2]) if len(parts) > 2 else 0
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    return "00:00:00"
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
@@ -230,4 +228,3 @@ def _number_selector(
             mode=selector.NumberSelectorMode.BOX,
         )
     )
-
