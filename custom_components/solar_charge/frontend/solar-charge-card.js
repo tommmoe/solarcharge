@@ -4,7 +4,7 @@ function v(s) {
     (e) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[e] ?? e
   );
 }
-function f(s) {
+function b(s) {
   const e = Number(s == null ? void 0 : s.state);
   return Number.isFinite(e) ? e : 0;
 }
@@ -115,8 +115,8 @@ const D = {
   battery: 25
 };
 function G(s, e) {
-  const o = D[s], t = D[e], n = t[0] - o[0], r = t[1] - o[1], a = Math.hypot(n, r) || 1, i = n / a, l = r / a, p = o[0] + i * E[s], d = o[1] + l * E[s], c = t[0] - i * E[e], h = t[1] - l * E[e], b = (p + c) / 2, m = (d + h) / 2, x = a * 0.05 * (b < 180 ? -1 : b > 180 ? 1 : 0), w = b + -l * x, u = m + i * x;
-  return `M ${p.toFixed(1)} ${d.toFixed(1)} Q ${w.toFixed(1)} ${u.toFixed(1)} ${c.toFixed(1)} ${h.toFixed(1)}`;
+  const o = D[s], t = D[e], a = t[0] - o[0], r = t[1] - o[1], n = Math.hypot(a, r) || 1, i = a / n, l = r / n, p = o[0] + i * E[s], d = o[1] + l * E[s], c = t[0] - i * E[e], h = t[1] - l * E[e], f = (p + c) / 2, u = (d + h) / 2, x = n * 0.05 * (f < 180 ? -1 : f > 180 ? 1 : 0), w = f + -l * x, m = u + i * x;
+  return `M ${p.toFixed(1)} ${d.toFixed(1)} Q ${w.toFixed(1)} ${m.toFixed(1)} ${c.toFixed(1)} ${h.toFixed(1)}`;
 }
 class X extends HTMLElement {
   constructor() {
@@ -185,30 +185,30 @@ class X extends HTMLElement {
     this._hass = e, this._render();
   }
   getCardSize() {
-    return 8;
+    return 5;
   }
   static getStubConfig() {
     return { type: "custom:solar-charge-card", entity: "sensor.solar_charge_status", title: "Solar Charge" };
   }
   _baseId() {
-    var o, t, n, r;
-    const e = (r = ((t = (o = this._config) == null ? void 0 : o.entities) == null ? void 0 : t.status) ?? ((n = this._config) == null ? void 0 : n.entity)) == null ? void 0 : r.split(".")[1];
+    var o, t, a, r;
+    const e = (r = ((t = (o = this._config) == null ? void 0 : o.entities) == null ? void 0 : t.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : r.split(".")[1];
     return e != null && e.endsWith("_status") ? e.slice(0, -7) : e;
   }
   _ent() {
-    var n, r;
-    const e = ((n = this._config) == null ? void 0 : n.entities) ?? {}, o = this._baseId(), t = {};
-    for (const a of Object.keys(A)) {
-      const [i, l] = A[a], p = o ? `${i}.${o}_${l}` : void 0;
-      t[a] = e[a] ?? this._resolveGeneratedEntity(i, l, p);
+    var a, r;
+    const e = ((a = this._config) == null ? void 0 : a.entities) ?? {}, o = this._baseId(), t = {};
+    for (const n of Object.keys(A)) {
+      const [i, l] = A[n], p = o ? `${i}.${o}_${l}` : void 0;
+      t[n] = e[n] ?? this._resolveGeneratedEntity(i, l, p);
     }
     return (r = this._config) != null && r.entity && (t.status = e.status ?? this._config.entity), t;
   }
   _resolveGeneratedEntity(e, o, t) {
     if (!this._hass || !t || this._hass.states[t]) return t;
-    const n = `_${o}`, r = Object.keys(this._hass.states).filter((a) => {
-      const [i, l] = a.split(".", 2);
-      return i === e && (l == null ? void 0 : l.endsWith(n));
+    const a = `_${o}`, r = Object.keys(this._hass.states).filter((n) => {
+      const [i, l] = n.split(".", 2);
+      return i === e && (l == null ? void 0 : l.endsWith(a));
     });
     return r.length === 1 ? r[0] : t;
   }
@@ -217,7 +217,7 @@ class X extends HTMLElement {
     return e ? (o = this._hass) == null ? void 0 : o.states[e] : void 0;
   }
   async _handleClick(e) {
-    var n;
+    var a;
     const o = e.composedPath().find(
       (r) => r instanceof HTMLElement && r.dataset.action
     );
@@ -234,8 +234,8 @@ class X extends HTMLElement {
         entity_id: t.controlEnabled
       });
     } else if (o.dataset.action === "snooze" && t.mode) {
-      const r = C(this._s(t.mode)), a = ((n = this._config) == null ? void 0 : n.snooze_minutes) ?? 5;
-      this._saveSnooze({ endsAt: Date.now() + a * 6e4, prevMode: r }), this._startSnoozeTimer(), await this._hass.callService("select", "select_option", {
+      const r = C(this._s(t.mode)), n = ((a = this._config) == null ? void 0 : a.snooze_minutes) ?? 5;
+      this._saveSnooze({ endsAt: Date.now() + n * 6e4, prevMode: r }), this._startSnoozeTimer(), await this._hass.callService("select", "select_option", {
         entity_id: t.mode,
         option: "Off"
       });
@@ -250,11 +250,11 @@ class X extends HTMLElement {
   _render() {
     var P, T, W;
     if (!this.shadowRoot || !this._config) return;
-    const e = this._ent(), o = C(this._s(e.status)), t = g(this._s(e.allowedToCharge)), n = g(this._s(e.controlEnabled)), r = g(this._s(e.gridSensorOk)) && g(this._s(e.chargerSensorOk)) && g(this._s(e.breakerLimitOk)), a = C(this._s(e.mode)), i = C(this._s(e.chargerStatus)), l = this._carConnected(i), p = this._config.show_controls !== !1, d = r ? t ? "active" : "idle" : "danger", c = this._loadSnooze(), h = !!c && Date.now() < c.endsAt;
+    const e = this._ent(), o = C(this._s(e.status)), t = g(this._s(e.allowedToCharge)), a = g(this._s(e.controlEnabled)), r = g(this._s(e.gridSensorOk)) && g(this._s(e.chargerSensorOk)) && g(this._s(e.breakerLimitOk)), n = C(this._s(e.mode)), i = C(this._s(e.chargerStatus)), l = this._carConnected(i), p = this._config.show_controls !== !1, d = r ? t ? "active" : "idle" : "danger", c = this._loadSnooze(), h = !!c && Date.now() < c.endsAt;
     c && Date.now() >= c.endsAt && this._restoreFromSnooze(c);
-    const b = h ? V(c.endsAt - Date.now()) : "", m = this._config.snooze_minutes ?? 5, x = /* @__PURE__ */ new Date(), w = x.getHours() + x.getMinutes() / 60, u = j(w), y = w >= 18 && w < 21, _ = y && g(this._s(e.zeroheroEligible)), k = g(this._s(e.evCharging)), z = (P = this._s(e.evLastCharged)) == null ? void 0 : P.state, M = !!z && z !== "unknown" && z !== "unavailable", O = M ? B(z) : null, L = l && !k && (!M || O != null && O >= 24);
+    const f = h ? V(c.endsAt - Date.now()) : "", u = this._config.snooze_minutes ?? 5, x = /* @__PURE__ */ new Date(), w = x.getHours() + x.getMinutes() / 60, m = j(w), y = w >= 18 && w < 21, _ = y && g(this._s(e.zeroheroEligible)), k = g(this._s(e.evCharging)), z = (P = this._s(e.evLastCharged)) == null ? void 0 : P.state, M = !!z && z !== "unknown" && z !== "unavailable", O = M ? B(z) : null, L = l && !k && (!M || O != null && O >= 24);
     this.shadowRoot.innerHTML = `
-      <style>${J}</style>
+      <style>${U}</style>
       <article class="card ${d}">
 
         <header class="header">
@@ -267,8 +267,8 @@ class X extends HTMLElement {
               <div class="zerohero-badge ${_ ? "ok" : "risk"}">
                 ${_ ? "✓" : "⚠"} ZeroHero
               </div>` : ""}
-            <div class="period-badge" style="background:${u.color}20;color:${u.color};border-color:${u.color}40">
-              ${v(u.label)} · ${v(u.cost)}
+            <div class="period-badge" style="background:${m.color}20;color:${m.color};border-color:${m.color}40">
+              ${v(m.label)} · ${v(m.cost)}
             </div>
             <div class="status-pill ${d}">
               <span></span>${t ? "Charging" : r ? "Waiting" : "Check"}
@@ -286,8 +286,8 @@ class X extends HTMLElement {
         </section>
 
         <section class="info-row">
-          <div><span class="lbl">Mode</span><strong>${v(a)}</strong></div>
-          <div><span class="lbl">Control</span><strong>${n ? "On" : "Off"}</strong></div>
+          <div><span class="lbl">Mode</span><strong>${v(n)}</strong></div>
+          <div><span class="lbl">Control</span><strong>${a ? "On" : "Off"}</strong></div>
           <div><span class="lbl">Car</span><strong>${l ? "Connected" : "Away"}</strong></div>
           <div><span class="lbl">Free window</span><strong>${g(this._s(e.inFreeWindow)) ? "Active ☀️" : "—"}</strong></div>
         </section>
@@ -337,25 +337,25 @@ class X extends HTMLElement {
           <section class="controls-row">
             <div class="mode-buttons">
               ${q.map((I) => `
-                <button class="${a === I.option ? "sel" : ""}"
+                <button class="${n === I.option ? "sel" : ""}"
                   data-action="mode" data-option="${I.option}" type="button">
                   ${I.label}
                 </button>`).join("")}
             </div>
-            <button class="ctrl-toggle ${n ? "on" : ""}"
+            <button class="ctrl-toggle ${a ? "on" : ""}"
               data-action="toggle-control" type="button">
-              ${n ? "Disable" : "Enable"} control
+              ${a ? "Disable" : "Enable"} control
             </button>
           </section>
           <section class="snooze-row">
             ${h ? `
               <div class="snooze-active">
-                <span class="snooze-label">&#9654; Resuming in ${b}</span>
+                <span class="snooze-label">&#9654; Resuming in ${f}</span>
                 <button class="snooze-cancel" data-action="cancel-snooze" type="button">Cancel</button>
               </div>
             ` : `
               <button class="snooze-btn" data-action="snooze" type="button">
-                Off (${m} min)
+                Off (${u} min)
               </button>
             `}
           </section>` : ""}
@@ -364,7 +364,7 @@ class X extends HTMLElement {
   }
   // ── Power flow diagram ────────────────────────────────────────────────
   _renderFlow(e) {
-    const o = f(this._s(e.pvPower)), t = f(this._s(e.gridImport)), n = f(this._s(e.batteryPower)), r = f(this._s(e.chargerPower)), a = f(this._s(e.loadPower)), i = f(this._s(e.batterySoc)), l = o > 50, p = t > 50, d = t < -50, c = n > 50, h = n < -50, b = r > 50, m = a > 50, x = "#f59e0b", w = d ? "#22c55e" : "#ef4444", u = c ? "#3b82f6" : h ? "#f59e0b" : "#6b7280", y = "#a855f7", _ = "#64748b";
+    const o = b(this._s(e.pvPower)), t = b(this._s(e.gridImport)), a = b(this._s(e.batteryPower)), r = b(this._s(e.chargerPower)), n = b(this._s(e.loadPower)), i = b(this._s(e.batterySoc)), l = o > 50, p = t > 50, d = t < -50, c = a > 50, h = a < -50, f = r > 50, u = n > 50, x = "#f59e0b", w = d ? "#22c55e" : "#ef4444", m = c ? "#3b82f6" : h ? "#f59e0b" : "#6b7280", y = "#a855f7", _ = "#64748b";
     return `
     <div class="flow-wrap">
       <svg class="flow-svg" viewBox="0 0 360 300" preserveAspectRatio="xMidYMid meet">
@@ -376,9 +376,9 @@ class X extends HTMLElement {
         </defs>
         ${this._flowEdge("solar", "home", l, x, !1)}
         ${this._flowEdge("grid", "home", p || d, w, d)}
-        ${this._flowEdge("home", "battery", c || h, u, h)}
-        ${this._flowEdge("home", "ev", b, y, !1)}
-        ${this._flowEdge("home", "load", m, _, !1)}
+        ${this._flowEdge("home", "battery", c || h, m, h)}
+        ${this._flowEdge("home", "ev", f, y, !1)}
+        ${this._flowEdge("home", "load", u, _, !1)}
       </svg>
 
       <div class="node solar ${l ? "on" : ""}" style="--nc:${x}">
@@ -395,34 +395,34 @@ class X extends HTMLElement {
         ${this._homeIcon()}
       </div>
 
-      <div class="node battery ${c || h ? "on" : ""}" style="--nc:${u}">
+      <div class="node battery ${c || h ? "on" : ""}" style="--nc:${m}">
         ${this._batteryRing(i, c, h)}
         <div class="ntext"><div class="nval">${$(this._s(e.batteryPower))}</div><div class="nlbl">Battery</div></div>
       </div>
 
-      <div class="node ev ${b ? "on" : ""}" style="--nc:${y}">
-        ${this._evIcon(b)}
+      <div class="node ev ${f ? "on" : ""}" style="--nc:${y}">
+        ${this._evIcon(f)}
         <div class="ntext"><div class="nval">${$(this._s(e.chargerPower))}</div><div class="nlbl">EV</div></div>
       </div>
 
-      <div class="node load ${m ? "on" : ""}" style="--nc:${_}">
+      <div class="node load ${u ? "on" : ""}" style="--nc:${_}">
         ${this._loadIcon()}
         <div class="ntext"><div class="nval">${$(this._s(e.loadPower))}</div><div class="nlbl">Load</div></div>
       </div>
     </div>`;
   }
-  _flowEdge(e, o, t, n, r) {
-    const a = G(e, o);
+  _flowEdge(e, o, t, a, r) {
+    const n = G(e, o);
     return t ? `
-      <path d="${a}" fill="none" stroke="${n}" stroke-width="3" stroke-opacity="0.5" stroke-linecap="round"/>
-      <circle class="flow-dot" r="3.8" fill="${n}" filter="url(#sc-glow)">
-        <animateMotion dur="2s" repeatCount="indefinite" path="${a}" ${r ? 'keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : ""}/>
-      </circle>` : `<path d="${a}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.22))" stroke-width="2.5" stroke-linecap="round"/>`;
+      <path d="${n}" fill="none" stroke="${a}" stroke-width="3" stroke-opacity="0.5" stroke-linecap="round"/>
+      <circle class="flow-dot" r="3.8" fill="${a}" filter="url(#sc-glow)">
+        <animateMotion dur="2s" repeatCount="indefinite" path="${n}" ${r ? 'keyPoints="1;0" keyTimes="0;1" calcMode="linear"' : ""}/>
+      </circle>` : `<path d="${n}" fill="none" stroke="var(--divider-color,rgba(127,127,127,0.22))" stroke-width="2.5" stroke-linecap="round"/>`;
   }
   // ── EV 7-day history strip ────────────────────────────────────────────
   _renderEvWeek(e) {
-    var r, a;
-    const o = (a = (r = this._s(e.evEnergyToday)) == null ? void 0 : r.attributes) == null ? void 0 : a.daily_totals, t = [];
+    var r, n;
+    const o = (n = (r = this._s(e.evEnergyToday)) == null ? void 0 : r.attributes) == null ? void 0 : n.daily_totals, t = [];
     for (let i = 6; i >= 0; i--) {
       const l = /* @__PURE__ */ new Date();
       l.setDate(l.getDate() - i);
@@ -433,7 +433,7 @@ class X extends HTMLElement {
         label: ["S", "M", "T", "W", "T", "F", "S"][l.getDay()]
       });
     }
-    const n = Math.max(...t.map((i) => i.kwh), 1);
+    const a = Math.max(...t.map((i) => i.kwh), 1);
     return `
     <div class="ev-week">
       ${t.map((i, l) => `
@@ -441,7 +441,7 @@ class X extends HTMLElement {
           <span class="ev-day-val">${i.kwh >= 0.05 ? i.kwh.toFixed(1) : ""}</span>
           <div class="ev-day-bar">
             <div class="ev-day-fill ${i.kwh >= 0.05 ? "" : "empty"} ${l === 6 ? "today" : ""}"
-              style="height:${Math.max(4, i.kwh / n * 100).toFixed(1)}%"></div>
+              style="height:${Math.max(4, i.kwh / a * 100).toFixed(1)}%"></div>
           </div>
           <span class="ev-day-lbl ${l === 6 ? "today" : ""}">${i.label}</span>
         </div>`).join("")}
@@ -549,16 +549,16 @@ class Z extends HTMLElement {
     return { type: "custom:solar-charge-tariff-card", entity: "sensor.solar_charge_status" };
   }
   _baseId() {
-    var o, t, n, r;
-    const e = (r = ((t = (o = this._config) == null ? void 0 : o.entities) == null ? void 0 : t.status) ?? ((n = this._config) == null ? void 0 : n.entity)) == null ? void 0 : r.split(".")[1];
+    var o, t, a, r;
+    const e = (r = ((t = (o = this._config) == null ? void 0 : o.entities) == null ? void 0 : t.status) ?? ((a = this._config) == null ? void 0 : a.entity)) == null ? void 0 : r.split(".")[1];
     return e != null && e.endsWith("_status") ? e.slice(0, -7) : e;
   }
   _ent() {
-    var n, r;
-    const e = ((n = this._config) == null ? void 0 : n.entities) ?? {}, o = this._baseId(), t = {};
-    for (const a of Object.keys(H)) {
-      const [i, l] = H[a];
-      t[a] = e[a] ?? (o ? `${i}.${o}_${l}` : void 0);
+    var a, r;
+    const e = ((a = this._config) == null ? void 0 : a.entities) ?? {}, o = this._baseId(), t = {};
+    for (const n of Object.keys(H)) {
+      const [i, l] = H[n];
+      t[n] = e[n] ?? (o ? `${i}.${o}_${l}` : void 0);
     }
     return (r = this._config) != null && r.entity && (t.status = e.status ?? this._config.entity), t;
   }
@@ -569,22 +569,22 @@ class Z extends HTMLElement {
   _render() {
     var y, _;
     if (!this.shadowRoot || !this._config) return;
-    const e = this._ent(), o = /* @__PURE__ */ new Date(), t = o.getHours() + o.getMinutes() / 60, n = j(t), r = this._config.battery_capacity_kwh ?? 48, a = g(this._s(e.zeroheroEligible)), i = f(this._s(e.zeroheroImportKwh)), l = f(this._s(e.superExportKwh)), p = f(this._s(e.overnightAvgConsumption)) || null, d = f(this._s(e.overnightReservePct)), c = f(this._s(e.overnightSnapshotCount)), h = f(this._s(e.currentInverterSlot)) || 0, b = f(this._s(e.batterySoc)), m = t >= 18 && t < 21, x = ((y = S.find((k) => k.start > t)) == null ? void 0 : y.start) ?? S[0].start + 24, w = Math.round((x - t) * 60), u = ((_ = S.find((k) => k.start === x % 24)) == null ? void 0 : _.label) ?? "";
+    const e = this._ent(), o = /* @__PURE__ */ new Date(), t = o.getHours() + o.getMinutes() / 60, a = j(t), r = this._config.battery_capacity_kwh ?? 48, n = g(this._s(e.zeroheroEligible)), i = b(this._s(e.zeroheroImportKwh)), l = b(this._s(e.superExportKwh)), p = b(this._s(e.overnightAvgConsumption)) || null, d = b(this._s(e.overnightReservePct)), c = b(this._s(e.overnightSnapshotCount)), h = b(this._s(e.currentInverterSlot)) || 0, f = b(this._s(e.batterySoc)), u = t >= 18 && t < 21, x = ((y = S.find((k) => k.start > t)) == null ? void 0 : y.start) ?? S[0].start + 24, w = Math.round((x - t) * 60), m = ((_ = S.find((k) => k.start === x % 24)) == null ? void 0 : _.label) ?? "";
     this.shadowRoot.innerHTML = `
-      <style>${U}</style>
+      <style>${J}</style>
       <article class="card">
 
         <header class="t-header">
           <h2>${v(this._config.title ?? "Energy Schedule")}</h2>
-          <div class="current-period" style="color:${n.color}">
-            ${v(n.label)} &nbsp;·&nbsp; ${v(n.cost)}/kWh
+          <div class="current-period" style="color:${a.color}">
+            ${v(a.label)} &nbsp;·&nbsp; ${v(a.cost)}/kWh
           </div>
         </header>
 
         <section class="timeline-wrap">
           ${this._renderTimeline(t)}
           <div class="next-period">
-            Next: <strong>${v(u)}</strong>
+            Next: <strong>${v(m)}</strong>
             in ${Math.floor(w / 60)}h ${w % 60}m
           </div>
         </section>
@@ -592,27 +592,27 @@ class Z extends HTMLElement {
         <section class="two-col">
 
           <!-- ZeroHero -->
-          <div class="panel ${m ? a ? "panel-ok" : "panel-warn" : "panel-dim"}">
+          <div class="panel ${u ? n ? "panel-ok" : "panel-warn" : "panel-dim"}">
             <div class="panel-title">🏆 ZeroHero Credit</div>
             <div class="panel-sub">$1/day if imports ≤ 0.09 kWh (6pm–9pm)</div>
-            ${m ? `
+            ${u ? `
               <div class="bar-wrap">
                 <div class="bar-track">
-                  <div class="bar-fill ${a ? "green" : "red"}"
+                  <div class="bar-fill ${n ? "green" : "red"}"
                     style="width:${Math.min(100, i / 0.09 * 100).toFixed(1)}%"></div>
                 </div>
                 <span class="bar-val">${i.toFixed(3)} / 0.09 kWh</span>
               </div>
-              <div class="panel-status ${a ? "ok" : "bad"}">
-                ${a ? "✓ On track" : "✗ Limit exceeded"}
+              <div class="panel-status ${n ? "ok" : "bad"}">
+                ${n ? "✓ On track" : "✗ Limit exceeded"}
               </div>` : t >= 21 ? '<div class="panel-status dim">Window closed</div>' : `<div class="panel-status dim">Window starts ${21 - Math.ceil(t)}h ${t < 18 ? Math.round((18 - t) * 60) + "m" : ""}~</div>`}
           </div>
 
           <!-- Super Export -->
-          <div class="panel ${m ? "panel-purple" : "panel-dim"}">
+          <div class="panel ${u ? "panel-purple" : "panel-dim"}">
             <div class="panel-title">⚡ Super Export</div>
             <div class="panel-sub">15c/kWh on first 15 kWh (6pm–9pm)</div>
-            ${m || l > 0 ? `
+            ${u || l > 0 ? `
               <div class="bar-wrap">
                 <div class="bar-track">
                   <div class="bar-fill purple"
@@ -641,9 +641,9 @@ class Z extends HTMLElement {
               <span class="ov-sub">≈ ${d ? F(d / 100 * r) : "—"}</span>
             </div>
             <div class="ov-stat">
-              <span class="ov-val">${b ? Math.round(b) + "%" : "—"}</span>
+              <span class="ov-val">${f ? Math.round(f) + "%" : "—"}</span>
               <span class="ov-lbl">Current SOC</span>
-              <span class="ov-sub">≈ ${F(b / 100 * r)}</span>
+              <span class="ov-sub">≈ ${F(f / 100 * r)}</span>
             </div>
             <div class="ov-stat">
               <span class="ov-val">${h ? `Slot ${h}` : "—"}</span>
@@ -658,14 +658,14 @@ class Z extends HTMLElement {
   }
   _renderTimeline(e) {
     const t = S.map((r) => {
-      const a = (r.end - r.start) / 24 * 100;
+      const n = (r.end - r.start) / 24 * 100;
       return r.start / 24 * 100, `<div class="t-bar" title="${r.label} ${r.cost}"
-        style="width:${a.toFixed(2)}%;background:${r.color};opacity:0.85"></div>`;
-    }).join(""), n = e / 24 * 100;
+        style="width:${n.toFixed(2)}%;background:${r.color};opacity:0.85"></div>`;
+    }).join(""), a = e / 24 * 100;
     return `
     <div class="timeline">
       <div class="t-bars">${t}</div>
-      <div class="t-now" style="left:${n.toFixed(2)}%">
+      <div class="t-now" style="left:${a.toFixed(2)}%">
         <div class="t-now-line"></div>
         <div class="t-now-label">Now</div>
       </div>
@@ -687,8 +687,12 @@ class Z extends HTMLElement {
     }[e] ?? "—";
   }
 }
-const J = `
-:host { display: block; color: var(--primary-text-color, #1f2933); }
+const U = `
+:host {
+  display: block;
+  color: var(--primary-text-color, #1f2933);
+  container-type: inline-size;
+}
 
 .card {
   background: var(--ha-card-background, var(--card-background-color, #fff));
@@ -930,6 +934,48 @@ button.sel, .ctrl-toggle.on {
   .flow-dot { display: none; }
 }
 
+/* Use the available card width, rather than the viewport width, to switch to
+   a compact landscape layout. This keeps the existing layout in a narrow HA
+   section and on mobile, while a section-spanning card becomes much shorter. */
+@container (min-width: 760px) {
+  .card {
+    display: grid;
+    grid-template-columns: minmax(330px, 5fr) minmax(390px, 7fr);
+    grid-template-areas:
+      "accent accent"
+      "header header"
+      "banner banner"
+      "flow info"
+      "flow metrics"
+      "flow history"
+      "flow reason"
+      "flow safety"
+      "controls controls"
+      "snooze snooze";
+    align-items: stretch;
+  }
+  .card::before { grid-area: accent; }
+  .header { grid-area: header; padding-bottom: 8px; }
+  .stale-banner { grid-area: banner; }
+  .flow-section {
+    grid-area: flow;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 8px 14px 12px;
+    border-right: 1px solid var(--divider-color,rgba(127,127,127,.18));
+  }
+  .flow-wrap { max-width: 390px; }
+  .info-row { grid-area: info; }
+  .metrics-grid { grid-area: metrics; padding-top: 10px; padding-bottom: 10px; }
+  .ev-history { grid-area: history; }
+  .ev-day-bar { height: 32px; }
+  .reason-row { grid-area: reason; }
+  .safety-row { grid-area: safety; }
+  .controls-row { grid-area: controls; }
+  .snooze-row { grid-area: snooze; }
+}
+
 @media (max-width: 520px) {
   .info-row { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .metrics-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
@@ -938,7 +984,7 @@ button.sel, .ctrl-toggle.on {
   .mode-buttons { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .header-right { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; }
 }
-`, U = `
+`, J = `
 :host { display: block; color: var(--primary-text-color, #1f2933); }
 
 .card {

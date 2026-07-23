@@ -295,7 +295,7 @@ class SolarChargeCard extends HTMLElement {
     this._render();
   }
 
-  getCardSize(): number { return 8; }
+  getCardSize(): number { return 5; }
 
   static getStubConfig(): FlowCardConfig {
     return { type: "custom:solar-charge-card", entity: "sensor.solar_charge_status", title: "Solar Charge" };
@@ -986,7 +986,11 @@ class SolarChargeTariffCard extends HTMLElement {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const FLOW_CSS = `
-:host { display: block; color: var(--primary-text-color, #1f2933); }
+:host {
+  display: block;
+  color: var(--primary-text-color, #1f2933);
+  container-type: inline-size;
+}
 
 .card {
   background: var(--ha-card-background, var(--card-background-color, #fff));
@@ -1226,6 +1230,48 @@ button.sel, .ctrl-toggle.on {
 
 @media (prefers-reduced-motion: reduce) {
   .flow-dot { display: none; }
+}
+
+/* Use the available card width, rather than the viewport width, to switch to
+   a compact landscape layout. This keeps the existing layout in a narrow HA
+   section and on mobile, while a section-spanning card becomes much shorter. */
+@container (min-width: 760px) {
+  .card {
+    display: grid;
+    grid-template-columns: minmax(330px, 5fr) minmax(390px, 7fr);
+    grid-template-areas:
+      "accent accent"
+      "header header"
+      "banner banner"
+      "flow info"
+      "flow metrics"
+      "flow history"
+      "flow reason"
+      "flow safety"
+      "controls controls"
+      "snooze snooze";
+    align-items: stretch;
+  }
+  .card::before { grid-area: accent; }
+  .header { grid-area: header; padding-bottom: 8px; }
+  .stale-banner { grid-area: banner; }
+  .flow-section {
+    grid-area: flow;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    padding: 8px 14px 12px;
+    border-right: 1px solid var(--divider-color,rgba(127,127,127,.18));
+  }
+  .flow-wrap { max-width: 390px; }
+  .info-row { grid-area: info; }
+  .metrics-grid { grid-area: metrics; padding-top: 10px; padding-bottom: 10px; }
+  .ev-history { grid-area: history; }
+  .ev-day-bar { height: 32px; }
+  .reason-row { grid-area: reason; }
+  .safety-row { grid-area: safety; }
+  .controls-row { grid-area: controls; }
+  .snooze-row { grid-area: snooze; }
 }
 
 @media (max-width: 520px) {
