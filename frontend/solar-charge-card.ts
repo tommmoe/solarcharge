@@ -106,8 +106,21 @@ type FlowCardConfig = {
   entity?: string;
   title?: string;
   show_controls?: boolean;
+  snooze_minutes?: number;
   entities?: Partial<Record<FlowEntityKey, string>>;
 };
+
+interface SnoozeState {
+  endsAt: number;   // Unix ms
+  prevMode: string; // e.g. "Free hours only"
+}
+
+function fmtCountdown(msRemaining: number): string {
+  const totalSecs = Math.max(0, Math.ceil(msRemaining / 1000));
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
 
 const FLOW_SUFFIXES: Record<FlowEntityKey, [string, string]> = {
   status:             ["sensor",        "status"],
@@ -197,11 +210,76 @@ function flowPath(from: FlowNodeKey, to: FlowNodeKey): string {
 class SolarChargeCard extends HTMLElement {
   private _hass?: HomeAssistant;
   private _config?: FlowCardConfig;
+  private _snoozeInterval?: ReturnType<typeof setInterval>;
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
     this.shadowRoot!.addEventListener("click", (e) => void this._handleClick(e));
+  }
+
+  connectedCallback(): void {
+    if (this._loadSnooze()) this._startSnoozeTimer();
+  }
+
+  disconnectedCallback(): void {
+    this._clearSnoozeTimer();
+  }
+
+  private _snoozeKey(): string {
+    return `solar_charge_snooze_${this._baseId() ?? "default"}`;
+  }
+
+  private _loadSnooze(): SnoozeState | null {
+    try {
+      const raw = localStorage.getItem(this._snoozeKey());
+      if (!raw) return null;
+      const s = JSON.parse(raw) as SnoozeState;
+      return typeof s.endsAt === "number" && typeof s.prevMode === "string" ? s : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private _saveSnooze(s: SnoozeState): void {
+    try { localStorage.setItem(this._snoozeKey(), JSON.stringify(s)); } catch { /* ignore */ }
+  }
+
+  private _clearSnooze(): void {
+    try { localStorage.removeItem(this._snoozeKey()); } catch { /* ignore */ }
+    this._clearSnoozeTimer();
+  }
+
+  private _startSnoozeTimer(): void {
+    this._clearSnoozeTimer();
+    this._snoozeInterval = setInterval(() => {
+      const s = this._loadSnooze();
+      if (!s) { this._clearSnoozeTimer(); this._render(); return; }
+      if (Date.now() >= s.endsAt) {
+        void this._restoreFromSnooze(s);
+      } else {
+        this._render();
+      }
+    }, 5000);
+  }
+
+  private _clearSnoozeTimer(): void {
+    if (this._snoozeInterval != null) {
+      clearInterval(this._snoozeInterval);
+      this._snoozeInterval = undefined;
+    }
+  }
+
+  private async _restoreFromSnooze(s: SnoozeState): Promise<void> {
+    this._clearSnooze();
+    this._render();
+    if (!this._hass) return;
+    const ent = this._ent();
+    if (ent.mode) {
+      await this._hass.callService("select", "select_option", {
+        entity_id: ent.mode, option: s.prevMode,
+      });
+    }
   }
 
   setConfig(config: FlowCardConfig): void {
@@ -280,6 +358,23 @@ class SolarChargeCard extends HTMLElement {
       await this._hass.callService("switch", on ? "turn_off" : "turn_on", {
         entity_id: ent.controlEnabled,
       });
+    } else if (target.dataset.action === "snooze" && ent.mode) {
+      const currentMode = stateText(this._s(ent.mode));
+      const minutes = this._config?.snooze_minutes ?? 5;
+      this._saveSnooze({ endsAt: Date.now() + minutes * 60_000, prevMode: currentMode });
+      this._startSnoozeTimer();
+      await this._hass.callService("select", "select_option", {
+        entity_id: ent.mode, option: "Off",
+      });
+    } else if (target.dataset.action === "cancel-snooze") {
+      const s = this._loadSnooze();
+      this._clearSnooze();
+      this._render();
+      if (s && this._hass && ent.mode) {
+        await this._hass.callService("select", "select_option", {
+          entity_id: ent.mode, option: s.prevMode,
+        });
+      }
     }
   }
 
@@ -298,6 +393,13 @@ class SolarChargeCard extends HTMLElement {
     const carConnected = this._carConnected(chargerSt);
     const showControls = this._config.show_controls !== false;
     const statusClass  = !safetyOk ? "danger" : allowed ? "active" : "idle";
+
+    // Snooze state
+    const snooze = this._loadSnooze();
+    const snoozeActive = !!snooze && Date.now() < snooze.endsAt;
+    if (snooze && Date.now() >= snooze.endsAt) void this._restoreFromSnooze(snooze);
+    const snoozeCountdown = snoozeActive ? fmtCountdown(snooze!.endsAt - Date.now()) : "";
+    const snoozeMins = this._config.snooze_minutes ?? 5;
 
     // Tariff period
     const now = new Date();
@@ -410,6 +512,18 @@ class SolarChargeCard extends HTMLElement {
               data-action="toggle-control" type="button">
               ${ctrlEnabled ? "Disable" : "Enable"} control
             </button>
+          </section>
+          <section class="snooze-row">
+            ${snoozeActive ? `
+              <div class="snooze-active">
+                <span class="snooze-label">&#9654; Resuming in ${snoozeCountdown}</span>
+                <button class="snooze-cancel" data-action="cancel-snooze" type="button">Cancel</button>
+              </div>
+            ` : `
+              <button class="snooze-btn" data-action="snooze" type="button">
+                Off (${snoozeMins} min)
+              </button>
+            `}
           </section>` : ""}
 
       </article>`;
@@ -1087,6 +1201,28 @@ button.sel, .ctrl-toggle.on {
   color: var(--text-primary-color,#fff);
 }
 .ctrl-toggle { white-space: nowrap; }
+
+/* Snooze */
+.snooze-row {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 0 16px 12px; gap: 8px;
+}
+.snooze-btn {
+  font-size: 0.75rem; min-height: 28px; padding: 0 10px;
+  opacity: 0.75;
+}
+.snooze-btn:hover { opacity: 1; }
+.snooze-active {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(168,85,247,.12); border: 1px solid rgba(168,85,247,.35);
+  border-radius: 8px; padding: 4px 10px;
+}
+.snooze-label { font-size: 0.78rem; font-weight: 700; color: #a855f7; white-space: nowrap; }
+.snooze-cancel {
+  font-size: 0.72rem; min-height: 24px; padding: 0 8px;
+  background: transparent; border-color: rgba(168,85,247,.45); color: #a855f7;
+}
+.snooze-cancel:hover { background: rgba(168,85,247,.15); border-color: #a855f7; }
 
 @media (prefers-reduced-motion: reduce) {
   .flow-dot { display: none; }
