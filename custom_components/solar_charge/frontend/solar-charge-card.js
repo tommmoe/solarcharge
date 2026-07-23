@@ -112,7 +112,7 @@ const D = {
   ev: 26,
   load: 26,
   home: 28,
-  battery: 25
+  battery: 26
 };
 function G(s, e) {
   const o = D[s], t = D[e], a = t[0] - o[0], r = t[1] - o[1], n = Math.hypot(a, r) || 1, i = a / n, l = r / n, p = o[0] + i * E[s], d = o[1] + l * E[s], c = t[0] - i * E[e], h = t[1] - l * E[e], f = (p + c) / 2, u = (d + h) / 2, x = n * 0.05 * (f < 180 ? -1 : f > 180 ? 1 : 0), w = f + -l * x, m = u + i * x;
@@ -791,7 +791,7 @@ p  { margin: 4px 0 0; font-size: 0.88rem; color: var(--secondary-text-color, #66
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color,#1d6f9f) 11%, transparent);
 }
 
-.bat-ring { display: block; width: 16.5cqw; height: 16.5cqw; }
+.bat-ring { display: block; width: 19cqw; height: 19cqw; }
 
 .nval { font-size: 0.8rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nlbl { font-size: 0.62rem; font-weight: 600; color: var(--secondary-text-color,#667085); text-transform: uppercase; letter-spacing: .04em; }

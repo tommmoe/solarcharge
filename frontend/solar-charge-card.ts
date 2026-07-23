@@ -186,10 +186,10 @@ const FLOW_POS: Record<FlowNodeKey, [number, number]> = {
   solar: [104, 52], grid: [256, 52], home: [180, 150],
   battery: [70, 244], ev: [180, 244], load: [290, 244],
 };
-// true visual radius of each node circle (+ small gap) so a connector stops
-// just outside it. Battery is smaller: its SOC ring sits inside padding.
+// True visual radius of each node circle (+ small gap) so a connector stops
+// just outside it. The battery SOC ring matches the other outer nodes.
 const FLOW_RAD: Record<FlowNodeKey, number> = {
-  solar: 26, grid: 26, ev: 26, load: 26, home: 28, battery: 25,
+  solar: 26, grid: 26, ev: 26, load: 26, home: 28, battery: 26,
 };
 
 // Straight connector trimmed along its own direction by each node's radius,
@@ -1089,7 +1089,7 @@ p  { margin: 4px 0 0; font-size: 0.88rem; color: var(--secondary-text-color, #66
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary-color,#1d6f9f) 11%, transparent);
 }
 
-.bat-ring { display: block; width: 16.5cqw; height: 16.5cqw; }
+.bat-ring { display: block; width: 19cqw; height: 19cqw; }
 
 .nval { font-size: 0.8rem; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nlbl { font-size: 0.62rem; font-weight: 600; color: var(--secondary-text-color,#667085); text-transform: uppercase; letter-spacing: .04em; }
