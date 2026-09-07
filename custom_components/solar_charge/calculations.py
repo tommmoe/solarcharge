@@ -323,7 +323,26 @@ def _solar_decision(
         )
 
     voltage_v = max(float(settings.voltage_v), 1.0)
-    solar_surplus_w = max(0.0, -base_grid_import_w)
+    if inputs.pv_power_w is None:
+        return _decision(
+            False,
+            0,
+            spare_capacity_w,
+            safe_limit_w,
+            base_grid_import_w,
+            charger_power_w,
+            "PV power unavailable",
+            emergency_stop,
+        )
+
+    # Grid export is not necessarily solar export: a hybrid inverter may export
+    # stored battery energy during a high feed-in-tariff window.  Remove any
+    # battery discharge from the measured export and cap the result at actual
+    # PV production so battery-funded export cannot start or sustain EV charging.
+    grid_export_w = max(0.0, -base_grid_import_w)
+    battery_discharge_w = max(0.0, -float(inputs.battery_power_w or 0.0))
+    pv_power_w = max(0.0, float(inputs.pv_power_w))
+    solar_surplus_w = min(pv_power_w, max(0.0, grid_export_w - battery_discharge_w))
     solar_target_amps = _clamp_target_amps(
         floor((solar_surplus_w - float(settings.grid_buffer_w)) / voltage_v),
         settings.min_charge_amps,
@@ -378,4 +397,3 @@ def _decision(
         reason=reason,
         emergency_stop=emergency_stop,
     )
-

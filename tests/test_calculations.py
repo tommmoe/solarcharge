@@ -133,6 +133,8 @@ def test_outside_free_window_solar_export_allowed():
             charger_power_w=0,
             charger_current_a=None,
             charger_voltage_v=None,
+            pv_power_w=3500,
+            battery_power_w=0,
             now=datetime(2026, 1, 1, 16, 0),
         ),
         settings(mode="solar_only"),
@@ -140,6 +142,62 @@ def test_outside_free_window_solar_export_allowed():
 
     assert decision.allowed is True
     assert decision.target_amps == 8
+
+
+def test_battery_export_does_not_count_as_solar_surplus():
+    decision = calculate_charge_decision(
+        ChargeInputs(
+            grid_power_w=-3770,
+            charger_power_w=0,
+            charger_current_a=None,
+            charger_voltage_v=None,
+            pv_power_w=0,
+            battery_power_w=-5321,
+            now=datetime(2026, 9, 7, 18, 2),
+        ),
+        settings(mode="free_hours_or_solar"),
+    )
+
+    assert decision.allowed is False
+    assert decision.target_amps == 0
+    assert decision.reason == "No solar surplus available"
+
+
+def test_battery_contribution_is_removed_from_mixed_export():
+    decision = calculate_charge_decision(
+        ChargeInputs(
+            grid_power_w=-4000,
+            charger_power_w=0,
+            charger_current_a=None,
+            charger_voltage_v=None,
+            pv_power_w=5000,
+            battery_power_w=-1000,
+            now=datetime(2026, 1, 1, 16, 0),
+        ),
+        settings(mode="solar_only"),
+    )
+
+    assert decision.allowed is True
+    assert decision.target_amps == 10
+
+
+def test_solar_mode_fails_safe_when_pv_power_is_unavailable():
+    decision = calculate_charge_decision(
+        ChargeInputs(
+            grid_power_w=-4000,
+            charger_power_w=0,
+            charger_current_a=None,
+            charger_voltage_v=None,
+            pv_power_w=None,
+            battery_power_w=0,
+            now=datetime(2026, 1, 1, 16, 0),
+        ),
+        settings(mode="solar_only"),
+    )
+
+    assert decision.allowed is False
+    assert decision.target_amps == 0
+    assert decision.reason == "PV power unavailable"
 
 
 def test_force_charge_is_still_limited_by_breaker_protection():
