@@ -89,6 +89,16 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             load_limit=LOAD_LIMIT_ESSENTIALS,
         ),
         # ── Slot 2 ── 11am → 2pm ──────────────────────────────────────────
+        # Deye constrains prog2 to 01:00-09:00. Repeat the overnight policy
+        # so prog3 can begin the free window at 11:00.
+        InverterSlot(
+            start_time=time(9, 0),
+            charge_mode=CHARGE_NO_GRID,
+            capacity_pct=reserve,
+            power_w=12000,
+            load_limit=LOAD_LIMIT_ESSENTIALS,
+        ),
+        # ── Slot 3 ── 2pm → 4pm ───────────────────────────────────────────
         # FREE electricity window. Pull from grid + solar to fill battery.
         InverterSlot(
             start_time=time(11, 0),
@@ -97,20 +107,10 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             power_w=12000,
             load_limit=LOAD_LIMIT_ESSENTIALS,
         ),
-        # ── Slot 3 ── 2pm → 4pm ───────────────────────────────────────────
-        # Shoulder rate resumes. Battery should be full; hold at 90% floor
-        # so any remaining solar keeps topping up rather than exporting at 0c.
+        # ── Slot 4 ── 4pm → 6pm ───────────────────────────────────────────
+        # Paid rates resume. Use battery for the house; no export yet.
         InverterSlot(
             start_time=time(14, 0),
-            charge_mode=CHARGE_NO_GRID,
-            capacity_pct=90,
-            power_w=12000,
-            load_limit=LOAD_LIMIT_ESSENTIALS,
-        ),
-        # ── Slot 4 ── 4pm → 6pm ───────────────────────────────────────────
-        # Peak starts (57.2c). Use battery to power the house; no export yet.
-        InverterSlot(
-            start_time=time(16, 0),
             charge_mode=CHARGE_NO_GRID,
             capacity_pct=20,
             power_w=12000,
@@ -125,7 +125,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
         InverterSlot(
             start_time=time(18, 0),
             charge_mode=CHARGE_NO_GRID,
-            capacity_pct=8,
+            capacity_pct=reserve,
             power_w=12000,
             load_limit=LOAD_LIMIT_ALLOW_EXPORT,
         ),
