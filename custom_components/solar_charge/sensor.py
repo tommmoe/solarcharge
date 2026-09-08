@@ -145,7 +145,6 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         translation_key="overnight_avg_consumption",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("overnight_avg_consumption_kwh"),
     ),
     SolarChargeSensorDescription(
@@ -166,7 +165,7 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         translation_key="zerohero_import_kwh",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
         value_fn=lambda data: data.get("zerohero_import_kwh"),
     ),
     SolarChargeSensorDescription(
@@ -174,7 +173,7 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         translation_key="super_export_kwh",
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         device_class=SensorDeviceClass.ENERGY,
-        state_class=SensorStateClass.MEASUREMENT,
+        state_class=SensorStateClass.TOTAL,
         value_fn=lambda data: data.get("super_export_kwh"),
     ),
     SolarChargeSensorDescription(
@@ -262,4 +261,3 @@ class SolarChargeSensor(CoordinatorEntity[SolarChargeCoordinator], SensorEntity)
         if not self.coordinator.data or self.entity_description.attributes_fn is None:
             return None
         return self.entity_description.attributes_fn(self.coordinator.data)
-
