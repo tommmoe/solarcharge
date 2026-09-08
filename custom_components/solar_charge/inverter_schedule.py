@@ -86,7 +86,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             charge_mode=CHARGE_NO_GRID,
             capacity_pct=reserve,
             power_w=12000,
-            load_limit=LOAD_LIMIT_ESSENTIALS,
+            load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
         # ── Slot 2 ── 11am → 2pm ──────────────────────────────────────────
         # Deye constrains prog2 to 01:00-09:00. Repeat the overnight policy
@@ -96,7 +96,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             charge_mode=CHARGE_NO_GRID,
             capacity_pct=reserve,
             power_w=12000,
-            load_limit=LOAD_LIMIT_ESSENTIALS,
+            load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
         # ── Slot 3 ── 2pm → 4pm ───────────────────────────────────────────
         # FREE electricity window. Pull from grid + solar to fill battery.
@@ -105,7 +105,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             charge_mode=CHARGE_ALLOW_GRID_AND_GEN,
             capacity_pct=100,
             power_w=12000,
-            load_limit=LOAD_LIMIT_ESSENTIALS,
+            load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
         # ── Slot 4 ── 4pm → 6pm ───────────────────────────────────────────
         # Paid rates resume. Use battery for the house; no export yet.
@@ -114,7 +114,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             charge_mode=CHARGE_NO_GRID,
             capacity_pct=20,
             power_w=12000,
-            load_limit=LOAD_LIMIT_ESSENTIALS,
+            load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
         # ── Slot 5 ── 6pm → 9pm ───────────────────────────────────────────
         # ZeroHero + Super Export window.
@@ -137,7 +137,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
             charge_mode=CHARGE_NO_GRID,
             capacity_pct=reserve,
             power_w=12000,
-            load_limit=LOAD_LIMIT_ESSENTIALS,
+            load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
     ]
 

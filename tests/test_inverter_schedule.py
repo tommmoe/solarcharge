@@ -27,3 +27,11 @@ def test_export_preserves_dynamic_overnight_reserve() -> None:
 
     assert slots[4].capacity_pct == 24
     assert slots[5].capacity_pct == 24
+
+
+def test_only_paid_export_window_allows_export() -> None:
+    slots = calculate_inverter_schedule(InverterScheduleInputs(overnight_reserve_pct=24))
+
+    assert slots[4].load_limit == "Allow Export"
+    assert all(slot.load_limit == "Zero Export" for slot in slots[:4])
+    assert slots[5].load_limit == "Zero Export"
