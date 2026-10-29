@@ -13,11 +13,13 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.loader import async_get_integration
 
 from .const import (
     ATTR_ENTRY_ID,
     ATTR_MODE,
     DOMAIN,
+    FRONTEND_CARD_URL,
     FRONTEND_PATH,
     MODES,
     PLATFORMS,
@@ -41,6 +43,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 
     hass.data.setdefault(DOMAIN, {})
     await _async_register_frontend_path(hass)
+    await _async_register_card_resource(hass)
 
     if hass.services.has_service(DOMAIN, SERVICE_FORCE_UPDATE):
         return True
@@ -120,6 +123,52 @@ async def _async_register_frontend_path(hass: HomeAssistant) -> None:
         )
     except RuntimeError:
         _LOGGER.debug("Frontend path already registered: %s", FRONTEND_PATH)
+
+
+async def _async_register_card_resource(hass: HomeAssistant) -> None:
+    """Point the Lovelace resource at the card with a ?v=<version> cache buster.
+
+    Browsers cache the card JS, so the URL must change on every release or
+    dashboards keep running an old card. Only storage-mode dashboards can be
+    managed; YAML-mode users still add the resource themselves.
+    """
+
+    try:
+        integration = await async_get_integration(hass, DOMAIN)
+        url = f"{FRONTEND_CARD_URL}?v={integration.version}"
+
+        lovelace = hass.data.get("lovelace")
+        resources = (
+            lovelace.get("resources")
+            if isinstance(lovelace, dict)
+            else getattr(lovelace, "resources", None)
+        )
+        if resources is None or not hasattr(resources, "async_create_item"):
+            _LOGGER.debug("Lovelace resources not in storage mode; add %s manually", url)
+            return
+
+        if not getattr(resources, "loaded", True):
+            await resources.async_load()
+            resources.loaded = True
+
+        matches = [
+            item
+            for item in resources.async_items()
+            if str(item.get("url", "")).split("?")[0] == FRONTEND_CARD_URL
+        ]
+        if not matches:
+            await resources.async_create_item({"res_type": "module", "url": url})
+            _LOGGER.info("Registered Lovelace resource %s", url)
+            return
+
+        for item in matches:
+            if item.get("url") != url:
+                await resources.async_update_item(
+                    item["id"], {"res_type": item.get("type", "module"), "url": url}
+                )
+                _LOGGER.info("Updated Lovelace resource to %s", url)
+    except Exception:  # noqa: BLE001 - never block setup over a dashboard resource
+        _LOGGER.warning("Could not register the Solar Charge card resource", exc_info=True)
 
 
 async def async_setup_entry(

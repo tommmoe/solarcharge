@@ -123,14 +123,14 @@ Default safety values for the first target setup:
 
 The repo includes a custom Lovelace card. When installed through HACS as an integration, the card JavaScript is bundled inside `custom_components/solar_charge/frontend/` and served by Home Assistant.
 
-Add this Lovelace resource after installing and restarting Home Assistant:
+The integration registers the Lovelace resource for you on startup, as `/solar_charge/solar-charge-card.js?v=<version>`, and updates the `?v=` on every release so browsers fetch the new card. No manual copy into `/config/www` is needed.
+
+If your dashboards are in YAML mode, add the resource yourself (bump `?v=` after each update):
 
 ```yaml
-url: /solar_charge/solar-charge-card.js
+url: /solar_charge/solar-charge-card.js?v=1.2.13
 type: module
 ```
-
-No manual copy into `/config/www` is needed.
 
 Basic card config:
 
