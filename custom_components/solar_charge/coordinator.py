@@ -12,7 +12,8 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import HomeAssistant, State
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -61,9 +62,12 @@ from .const import (
     CONF_PV_POWER_MULTIPLIER,
     CONF_SAFETY_MARGIN_AMPS,
     CONF_SENSOR_STALE_SECONDS,
+    CONF_SNOOZE_PREVIOUS_MODE,
+    CONF_SNOOZE_UNTIL,
     CONF_VOLTAGE,
     DEFAULTS,
     DOMAIN,
+    MODE_OFF,
     POWER_UNIT_AUTO,
     POWER_UNIT_KW,
     POWER_UNIT_W,
@@ -93,6 +97,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.latest_converted_values: dict[str, Any] = {}
         self.sensor_ages: dict[str, float | None] = {}
         self.last_error: str | None = None
+        self._snooze_unsub: CALLBACK_TYPE | None = None
         self.refresh_settings()
 
         super().__init__(
@@ -139,8 +144,87 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def async_set_config_value(self, key: str, value: Any) -> None:
         """Persist a runtime config value and refresh."""
 
+        updates = {key: value}
+        if key == CONF_MODE:
+            # An explicit mode change supersedes any pending snooze.
+            self.async_cancel_snooze_timer()
+            updates.update({CONF_SNOOZE_UNTIL: None, CONF_SNOOZE_PREVIOUS_MODE: None})
+        await self._async_update_options(updates)
+
+    @property
+    def snooze_until(self) -> datetime | None:
+        """Return when the active snooze ends, if any."""
+
+        value = self._settings.get(CONF_SNOOZE_UNTIL)
+        return dt_util.parse_datetime(value) if value else None
+
+    @property
+    def snooze_previous_mode(self) -> str | None:
+        """Return the mode restored when the snooze ends."""
+
+        return self._settings.get(CONF_SNOOZE_PREVIOUS_MODE) if self.snooze_until else None
+
+    async def async_snooze(self, minutes: float) -> None:
+        """Switch to Off for a number of minutes, then restore the current mode."""
+
+        previous = self.snooze_previous_mode or str(self._settings[CONF_MODE])
+        until = dt_util.utcnow() + timedelta(minutes=minutes)
+        await self._async_update_options(
+            {
+                CONF_MODE: MODE_OFF,
+                CONF_SNOOZE_UNTIL: until.isoformat(),
+                CONF_SNOOZE_PREVIOUS_MODE: previous,
+            }
+        )
+        self.async_schedule_snooze_end()
+
+    async def async_end_snooze(self) -> None:
+        """End an active snooze early (or on expiry) and restore the previous mode."""
+
+        self.async_cancel_snooze_timer()
+        previous = self.snooze_previous_mode
+        if previous is None:
+            return
+        await self._async_update_options(
+            {
+                CONF_MODE: previous,
+                CONF_SNOOZE_UNTIL: None,
+                CONF_SNOOZE_PREVIOUS_MODE: None,
+            }
+        )
+
+    @callback
+    def async_schedule_snooze_end(self) -> None:
+        """Arm the timer that restores the mode when the snooze expires."""
+
+        self.async_cancel_snooze_timer()
+        if (until := self.snooze_until) is None:
+            return
+
+        @callback
+        def _expired(_now: datetime) -> None:
+            self._snooze_unsub = None
+            self.hass.async_create_task(self.async_end_snooze())
+
+        self._snooze_unsub = async_track_point_in_utc_time(self.hass, _expired, until)
+
+    @callback
+    def async_cancel_snooze_timer(self) -> None:
+        """Disarm the snooze expiry timer without changing the mode."""
+
+        if self._snooze_unsub is not None:
+            self._snooze_unsub()
+            self._snooze_unsub = None
+
+    async def _async_update_options(self, updates: dict[str, Any]) -> None:
+        """Persist option changes (None removes a key) and refresh."""
+
         options = dict(self.entry.options)
-        options[key] = value
+        for key, value in updates.items():
+            if value is None:
+                options.pop(key, None)
+            else:
+                options[key] = value
         self.hass.config_entries.async_update_entry(self.entry, options=options)
         self.refresh_settings()
         self.update_interval = timedelta(

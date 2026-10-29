@@ -110,11 +110,6 @@ type FlowCardConfig = {
   entities?: Partial<Record<FlowEntityKey, string>>;
 };
 
-interface SnoozeState {
-  endsAt: number;   // Unix ms
-  prevMode: string; // e.g. "Free hours only"
-}
-
 function fmtCountdown(msRemaining: number): string {
   const totalSecs = Math.max(0, Math.ceil(msRemaining / 1000));
   const mins = Math.floor(totalSecs / 60);
@@ -218,67 +213,30 @@ class SolarChargeCard extends HTMLElement {
     this.shadowRoot!.addEventListener("click", (e) => void this._handleClick(e));
   }
 
-  connectedCallback(): void {
-    if (this._loadSnooze()) this._startSnoozeTimer();
-  }
-
   disconnectedCallback(): void {
     this._clearSnoozeTimer();
   }
 
-  private _snoozeKey(): string {
-    return `solar_charge_snooze_${this._baseId() ?? "default"}`;
+  // Snooze is run by the integration (so it restores even with no dashboard
+  // open); the card only reads the end time and ticks a local countdown.
+  private _snoozeEndsAt(): number | null {
+    const raw = this._s(this._ent().mode)?.attributes?.snooze_until;
+    const t = typeof raw === "string" ? Date.parse(raw) : NaN;
+    return Number.isFinite(t) && t > Date.now() ? t : null;
   }
 
-  private _loadSnooze(): SnoozeState | null {
-    try {
-      const raw = localStorage.getItem(this._snoozeKey());
-      if (!raw) return null;
-      const s = JSON.parse(raw) as SnoozeState;
-      return typeof s.endsAt === "number" && typeof s.prevMode === "string" ? s : null;
-    } catch {
-      return null;
+  private _syncSnoozeTimer(active: boolean): void {
+    if (active && this._snoozeInterval == null) {
+      this._snoozeInterval = setInterval(() => this._render(), 1000);
+    } else if (!active) {
+      this._clearSnoozeTimer();
     }
-  }
-
-  private _saveSnooze(s: SnoozeState): void {
-    try { localStorage.setItem(this._snoozeKey(), JSON.stringify(s)); } catch { /* ignore */ }
-  }
-
-  private _clearSnooze(): void {
-    try { localStorage.removeItem(this._snoozeKey()); } catch { /* ignore */ }
-    this._clearSnoozeTimer();
-  }
-
-  private _startSnoozeTimer(): void {
-    this._clearSnoozeTimer();
-    this._snoozeInterval = setInterval(() => {
-      const s = this._loadSnooze();
-      if (!s) { this._clearSnoozeTimer(); this._render(); return; }
-      if (Date.now() >= s.endsAt) {
-        void this._restoreFromSnooze(s);
-      } else {
-        this._render();
-      }
-    }, 5000);
   }
 
   private _clearSnoozeTimer(): void {
     if (this._snoozeInterval != null) {
       clearInterval(this._snoozeInterval);
       this._snoozeInterval = undefined;
-    }
-  }
-
-  private async _restoreFromSnooze(s: SnoozeState): Promise<void> {
-    this._clearSnooze();
-    this._render();
-    if (!this._hass) return;
-    const ent = this._ent();
-    if (ent.mode) {
-      await this._hass.callService("select", "select_option", {
-        entity_id: ent.mode, option: s.prevMode,
-      });
     }
   }
 
@@ -359,22 +317,13 @@ class SolarChargeCard extends HTMLElement {
         entity_id: ent.controlEnabled,
       });
     } else if (target.dataset.action === "snooze" && ent.mode) {
-      const currentMode = stateText(this._s(ent.mode));
-      const minutes = this._config?.snooze_minutes ?? 5;
-      this._saveSnooze({ endsAt: Date.now() + minutes * 60_000, prevMode: currentMode });
-      this._startSnoozeTimer();
-      await this._hass.callService("select", "select_option", {
-        entity_id: ent.mode, option: "Off",
+      await this._hass.callService("solar_charge", "snooze", {
+        entity_id: ent.mode, minutes: this._config?.snooze_minutes ?? 5,
       });
-    } else if (target.dataset.action === "cancel-snooze") {
-      const s = this._loadSnooze();
-      this._clearSnooze();
-      this._render();
-      if (s && this._hass && ent.mode) {
-        await this._hass.callService("select", "select_option", {
-          entity_id: ent.mode, option: s.prevMode,
-        });
-      }
+    } else if (target.dataset.action === "cancel-snooze" && ent.mode) {
+      await this._hass.callService("solar_charge", "cancel_snooze", {
+        entity_id: ent.mode,
+      });
     }
   }
 
@@ -395,10 +344,10 @@ class SolarChargeCard extends HTMLElement {
     const statusClass  = !safetyOk ? "danger" : allowed ? "active" : "idle";
 
     // Snooze state
-    const snooze = this._loadSnooze();
-    const snoozeActive = !!snooze && Date.now() < snooze.endsAt;
-    if (snooze && Date.now() >= snooze.endsAt) void this._restoreFromSnooze(snooze);
-    const snoozeCountdown = snoozeActive ? fmtCountdown(snooze!.endsAt - Date.now()) : "";
+    const snoozeEndsAt = this._snoozeEndsAt();
+    const snoozeActive = snoozeEndsAt != null;
+    this._syncSnoozeTimer(snoozeActive);
+    const snoozeCountdown = snoozeActive ? fmtCountdown(snoozeEndsAt - Date.now()) : "";
     const snoozeMins = this._config.snooze_minutes ?? 5;
 
     // Tariff period

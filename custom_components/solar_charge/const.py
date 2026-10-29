@@ -46,6 +46,8 @@ MODE_NAMES: dict[str, str] = {
 
 CONF_NAME = "name"
 CONF_MODE = "mode"
+CONF_SNOOZE_UNTIL = "snooze_until"
+CONF_SNOOZE_PREVIOUS_MODE = "snooze_previous_mode"
 CONF_ENABLED = "enabled"
 CONF_CONTROL_ENABLED = "control_enabled"
 
@@ -158,6 +160,9 @@ SERVICE_FORCE_UPDATE = "force_update"
 SERVICE_APPLY_NOW = "apply_now"
 SERVICE_STOP_CHARGING = "stop_charging"
 SERVICE_SET_MODE = "set_mode"
+SERVICE_SNOOZE = "snooze"
+SERVICE_CANCEL_SNOOZE = "cancel_snooze"
 
 ATTR_ENTRY_ID = "entry_id"
 ATTR_MODE = "mode"
+ATTR_MINUTES = "minutes"

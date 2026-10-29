@@ -135,6 +135,8 @@ async def async_setup_entry(
     await coordinator.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
+    coordinator.async_schedule_snooze_end()
+    entry.async_on_unload(coordinator.async_cancel_snooze_timer)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     _LOGGER.debug("Solar Charge entry %s set up", entry.entry_id)
 
@@ -161,4 +163,5 @@ async def _async_update_listener(
 
     if coordinator := hass.data.get(DOMAIN, {}).get(entry.entry_id):
         coordinator.refresh_settings()
+        coordinator.async_schedule_snooze_end()
         await coordinator.async_request_refresh()
