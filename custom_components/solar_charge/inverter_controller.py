@@ -34,8 +34,8 @@ class InverterController:
         self.coordinator = coordinator
         self.last_action: dict[str, Any] | None = None
 
-        # Track what was last successfully written so we don't repeat writes
-        self._last_written_slots: list[InverterSlot] | None = None
+        # Number of entity writes issued during the current reconcile pass
+        self._writes_this_pass = 0
         self._last_written_load_limit: str | None = None
 
     # ------------------------------------------------------------------
@@ -64,9 +64,10 @@ class InverterController:
             self._record("Deye entity prefix not configured; no writes")
             return
 
-        # Write program slots only when they change (not every 60 s)
-        if force or self._slots_changed(slots):
-            await self._write_all_slots(prefix, slots)
+        # Reconcile program slots every cycle. The setters skip values that
+        # already match, so this only writes when something has drifted —
+        # e.g. Deye Cloud / another controller overwriting the timer.
+        await self._write_all_slots(prefix, slots, log_unchanged=force)
 
         # Load limit changes intraday (e.g. 18:00 → Allow Export) — check every cycle
         await self._manage_load_limit(prefix, slots)
@@ -75,16 +76,19 @@ class InverterController:
     # Slot writing
     # ------------------------------------------------------------------
 
-    def _slots_changed(self, slots: list[InverterSlot]) -> bool:
-        if self._last_written_slots is None:
-            return True
-        if len(slots) != len(self._last_written_slots):
-            return True
-        return any(a != b for a, b in zip(slots, self._last_written_slots, strict=True))
+    async def _write_all_slots(
+        self,
+        prefix: str,
+        slots: list[InverterSlot],
+        log_unchanged: bool = False,
+    ) -> None:
+        """Reconcile all 6 slots against the Deye entities.
 
-    async def _write_all_slots(self, prefix: str, slots: list[InverterSlot]) -> None:
-        """Write all 6 slots to the Deye entities."""
+        Only entities whose current state differs from the target are
+        written, so calling this every cycle is cheap on Modbus.
+        """
         errors: list[str] = []
+        self._writes_this_pass = 0
 
         for i, slot in enumerate(slots):
             n = i + 1
@@ -114,6 +118,7 @@ class InverterController:
             if not all([time_ok, charge_ok, cap_ok, pwr_ok]):
                 errors.append(label)
 
+        writes = self._writes_this_pass
         if errors:
             self._record(
                 f"Wrote inverter slots (errors on: {', '.join(errors)})"
@@ -121,11 +126,13 @@ class InverterController:
             _LOGGER.warning(
                 "Inverter schedule write had errors on slots: %s", errors
             )
-        else:
-            self._record(f"Wrote {NUM_SLOTS} inverter program slots")
-            _LOGGER.info("Inverter schedule written successfully")
-
-        self._last_written_slots = list(slots)
+        elif writes:
+            self._record(f"Corrected {writes} inverter slot setting(s)")
+            _LOGGER.info(
+                "Inverter schedule drift corrected (%d entity writes)", writes
+            )
+        elif log_unchanged:
+            self._record(f"{NUM_SLOTS} inverter program slots already correct")
 
     # ------------------------------------------------------------------
     # Load limit management
@@ -193,6 +200,7 @@ class InverterController:
             return True  # Already correct — no write needed
 
         try:
+            self._writes_this_pass += 1
             await self.hass.services.async_call(
                 "select",
                 "select_option",
@@ -223,6 +231,7 @@ class InverterController:
             return True  # Close enough — skip write
 
         try:
+            self._writes_this_pass += 1
             await self.hass.services.async_call(
                 "number",
                 "set_value",
