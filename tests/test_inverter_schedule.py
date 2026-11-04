@@ -20,6 +20,8 @@ def test_schedule_fits_deye_program_row_time_ranges() -> None:
     assert slots[2].charge_mode == "Allow Grid & Gen"
     assert all(slot.charge_mode == "No Grid or Gen" for slot in slots[:2])
     assert all(slot.charge_mode == "No Grid or Gen" for slot in slots[3:])
+    # Only the export slot sells; without the flag the battery idles
+    assert [slot.sell for slot in slots] == [False, False, False, False, True, False]
 
 
 def test_export_preserves_dynamic_overnight_reserve() -> None:

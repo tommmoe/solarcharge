@@ -56,6 +56,13 @@ class InverterSlot:
     load_limit: str
     """Deye load-limit option string (controls export behaviour)."""
 
+    sell: bool = False
+    """Per-slot "sell" flag (bit 0x40 of the slot's charge register).
+
+    The battery only exports in Allow Export mode when the active slot has
+    this flag set — without it the inverter idles and the house runs on grid.
+    """
+
 
 @dataclass(frozen=True)
 class InverterScheduleInputs:
@@ -122,12 +129,15 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
         #   • 8% floor → maximise energy available for export
         #   • Earning up to 15c + 5c = 20c/kWh on first 15 kWh exported
         #   • Keeping grid import ≤ 0.09 kWh total earns the $1/day credit
+        #   • sell=True is required: without the slot's sell flag the battery
+        #     idles in Allow Export and the house runs on grid (3-4 Nov).
         InverterSlot(
             start_time=time(18, 0),
             charge_mode=CHARGE_NO_GRID,
             capacity_pct=reserve,
             power_w=12000,
             load_limit=LOAD_LIMIT_ALLOW_EXPORT,
+            sell=True,
         ),
         # ── Slot 6 ── 9pm → midnight ──────────────────────────────────────
         # Export window closed. Lock in the overnight reserve so the battery

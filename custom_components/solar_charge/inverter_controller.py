@@ -19,7 +19,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_DEYE_ENTITY_PREFIX, CONF_INVERTER_CONTROL_ENABLED
-from .inverter_schedule import InverterSlot, format_slot_time, current_slot_index
+from .inverter_schedule import (
+    LOAD_LIMIT_ALLOW_EXPORT,
+    InverterSlot,
+    current_slot_index,
+    format_slot_time,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,6 +77,11 @@ class InverterController:
         # Load limit changes intraday (e.g. 18:00 → Allow Export) — check every cycle
         await self._manage_load_limit(prefix, slots)
 
+        # The inverter's Solar Export (sell) switch must be on for the export
+        # slot. Deye Cloud used to toggle it; now we keep it in step with the
+        # active slot's load limit.
+        await self._manage_solar_export(prefix, slots)
+
     # ------------------------------------------------------------------
     # Slot writing
     # ------------------------------------------------------------------
@@ -114,8 +124,16 @@ class InverterController:
                 float(slot.power_w),
                 f"{label} power",
             )
+            # Sell flag lives in the same register as the charge mode, so
+            # write it after the charge select. Optional entity: older
+            # add-on configs don't poll progN_sell, so missing ≠ error.
+            sell_ok = await self._set_switch(
+                f"switch.{prefix}_prog{n}_sell",
+                slot.sell,
+                f"{label} sell",
+            )
 
-            if not all([time_ok, charge_ok, cap_ok, pwr_ok]):
+            if not all([time_ok, charge_ok, cap_ok, pwr_ok, sell_ok]):
                 errors.append(label)
 
         writes = self._writes_this_pass
@@ -183,6 +201,40 @@ class InverterController:
         )
         self._last_written_load_limit = target
 
+    async def _manage_solar_export(
+        self, prefix: str, slots: list[InverterSlot]
+    ) -> None:
+        """Turn the Solar Export switch on only while the export slot is active."""
+        now_time = dt_util.now().timetz().replace(tzinfo=None)
+        active_slot = slots[current_slot_index(now_time, slots)]
+        want_on = active_slot.load_limit == LOAD_LIMIT_ALLOW_EXPORT
+        target = "on" if want_on else "off"
+
+        entity_id = f"switch.{prefix}_solar_export"
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
+            _LOGGER.debug("Solar export entity not available: %s", entity_id)
+            return
+        if state.state == target:
+            return
+
+        try:
+            await self.hass.services.async_call(
+                "switch",
+                f"turn_{target}",
+                {"entity_id": entity_id},
+                blocking=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Failed to set solar export (%s): %s", entity_id, err)
+            return
+        _LOGGER.info("Solar export: %s → %s", state.state, target)
+        self._record(
+            f"Solar export {state.state} → {target}",
+            service=f"switch.turn_{target}",
+            entity_id=entity_id,
+        )
+
     # ------------------------------------------------------------------
     # Low-level entity writers
     # ------------------------------------------------------------------
@@ -208,6 +260,35 @@ class InverterController:
                 blocking=True,
             )
             _LOGGER.debug("Set %s: %r → %r", label, state.state, option)
+            return True
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Failed to set %s (%s): %s", label, entity_id, err)
+            return False
+
+    async def _set_switch(
+        self, entity_id: str, on: bool, label: str
+    ) -> bool:
+        """Set an optional switch entity. Missing entity counts as success."""
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            return True  # Not exposed by this add-on config — nothing to do
+        if state.state in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
+            _LOGGER.debug("Switch entity unavailable: %s", entity_id)
+            return False
+
+        target = "on" if on else "off"
+        if state.state == target:
+            return True
+
+        try:
+            self._writes_this_pass += 1
+            await self.hass.services.async_call(
+                "switch",
+                f"turn_{target}",
+                {"entity_id": entity_id},
+                blocking=True,
+            )
+            _LOGGER.debug("Set %s: %s → %s", label, state.state, target)
             return True
         except Exception as err:  # noqa: BLE001
             _LOGGER.warning("Failed to set %s (%s): %s", label, entity_id, err)

@@ -68,6 +68,11 @@ Deye/Sunsynk:
 - Battery SOC: `sensor.deye_battery_soc`
 - Load: `sensor.deye_load_power`
 
+Inverter control (18:00–21:00 export) also needs the Sunsynk add-on to poll
+the per-slot sell flags. Add these to the add-on's `SENSORS` list:
+`prog1_sell` … `prog6_sell` (and optionally `max_sell_power`). Without
+`prog5_sell` the battery idles in Allow Export mode and the house runs on grid.
+
 Beny/OCPP:
 
 - Current limit: `number.<charger_id>_maximum_current`
