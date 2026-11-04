@@ -57,6 +57,16 @@ BINARY_SENSORS: tuple[SolarChargeBinarySensorDescription, ...] = (
         value_fn=lambda data: data.get("zerohero_eligible", False),
     ),
     SolarChargeBinarySensorDescription(
+        key="export_allowed",
+        translation_key="export_allowed",
+        value_fn=lambda data: data.get("export_allowed", False),
+    ),
+    SolarChargeBinarySensorDescription(
+        key="overnight_reserve_is_fallback",
+        translation_key="overnight_reserve_is_fallback",
+        value_fn=lambda data: data.get("overnight_reserve_is_fallback", True),
+    ),
+    SolarChargeBinarySensorDescription(
         key="ev_charging",
         translation_key="ev_charging",
         value_fn=lambda data: data.get("ev_charging", False),

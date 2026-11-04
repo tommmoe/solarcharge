@@ -86,6 +86,30 @@ Beny/OCPP:
 
 If a source sensor needs scaling, configure the integration's multiplier instead of creating a template sensor. For example, if a raw Deye grid CT sensor is 10x too low, set the grid multiplier to `10`.
 
+## Overnight Reserve and Evening Export
+
+The 18:00–21:00 export must leave enough battery to carry the house to the
+11:00 free window. Solar Charge measures and protects this automatically:
+
+- **Measuring a night (21:00 → 11:00 next day):** usage = battery energy drawn
+  + grid import − grid export. Nights where the battery ran flat or was topped
+  up from the grid are measured correctly. A night with more than 15 minutes
+  unmeasured (HA down, sensors unavailable) is discarded rather than
+  under-counted. The night in progress is saved, so restarts don't lose it.
+- **Sizing the reserve:** the larger of the 90th-percentile night of the last
+  14 and the worst of the last 3, plus the configured margin (default 20 %),
+  rounded up. It rises within a night of a cold snap. Until 3 nights have been
+  measured the fallback reserve (default 30 %) is used.
+- **Stopping export:** all discharge slots run down to a 10 % hard floor
+  (Deye shutdown is 7 %). Export switches off for the evening once SOC reaches
+  10 % + reserve + the house load still expected before 21:00. The battery
+  then keeps powering the house, so the grid isn't used and the ZeroHero
+  credit is kept.
+
+Sensors: *Overnight planned usage*, *Last night usage*, *Overnight reserve*,
+*Export stop SOC*, *House power*, *Overnight nights measured*, and binary
+sensors *Evening export allowed* / *Overnight reserve using fallback*.
+
 ## Installation
 
 ### HACS Custom Repository

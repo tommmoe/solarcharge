@@ -100,7 +100,11 @@
       "status": { "name": "Status" },
       "overnight_avg_consumption": { "name": "Overnight avg consumption" },
       "overnight_reserve_pct": { "name": "Overnight reserve" },
-      "overnight_snapshot_count": { "name": "Overnight snapshot count" },
+      "overnight_design_kwh": { "name": "Overnight planned usage" },
+      "overnight_last_night_kwh": { "name": "Last night usage" },
+      "export_stop_soc": { "name": "Export stop SOC" },
+      "house_power": { "name": "House power" },
+      "overnight_snapshot_count": { "name": "Overnight nights measured" },
       "zerohero_import_kwh": { "name": "ZeroHero import (today)" },
       "super_export_kwh": { "name": "Super export (today)" },
       "current_inverter_slot": { "name": "Active inverter slot" },
@@ -115,6 +119,8 @@
       "charger_sensor_ok": { "name": "Charger sensor OK" },
       "breaker_limit_ok": { "name": "Breaker limit OK" },
       "zerohero_eligible": { "name": "ZeroHero credit eligible" },
+      "export_allowed": { "name": "Evening export allowed" },
+      "overnight_reserve_is_fallback": { "name": "Overnight reserve using fallback" },
       "ev_charging": { "name": "EV charging" }
     },
     "switch": {

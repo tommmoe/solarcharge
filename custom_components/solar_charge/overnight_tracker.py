@@ -1,76 +1,47 @@
-"""Overnight energy tracker for Solar Charge.
+"""Overnight energy tracker for Solar Charge (Home Assistant wrapper).
 
-Tracks battery SOC at key points in the day to calculate a rolling average
-of overnight energy consumption. This drives the dynamic reserve target
-written into the Deye inverter's program slots 1 and 6.
-
-Also accumulates grid import / export energy during the GloBird ZeroHero
-window (18:00 – 21:00) to show whether the $1/day credit will be earned
-and how much Super Export credit has been accumulated.
+All logic lives in ``overnight_model`` (pure, unit-tested). This class feeds
+it live readings, persists its state so restarts don't lose a night in
+progress, and tracks grid energy in the GloBird ZeroHero window
+(18:00 – 21:00) for the $1/day credit and Super Export.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime, time
 import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
-from homeassistant.util import dt as dt_util
+
+from .overnight_model import (
+    ExportGuard,
+    NightAccumulator,
+    NightRecord,
+    design_night_kwh,
+    reserve_pct,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_KEY = "solar_charge_overnight"
 STORAGE_VERSION = 1
+SAVE_DELAY_S = 60
 
 # ZeroHero: imports must average ≤ 0.03 kWh/h over 3 hours = 0.09 kWh total
 ZEROHERO_WINDOW_START = time(18, 0)
 ZEROHERO_WINDOW_END = time(21, 0)
 ZEROHERO_MAX_IMPORT_KWH = 0.09
 
-# Super Export: first 15 kWh exported 6pm–9pm earns 15c/kWh bonus
+# Super Export: first 15 kWh exported 6pm–9pm earns the bonus
 SUPER_EXPORT_MAX_KWH = 15.0
-
-# Snapshot windows — record SOC within these 2-minute windows each day
-SNAPSHOT_2100_START = time(21, 0)
-SNAPSHOT_2100_END = time(21, 2)
-SNAPSHOT_1100_START = time(11, 0)
-SNAPSHOT_1100_END = time(11, 2)
-
-MAX_STORED_DAYS = 30
-
-
-@dataclass
-class OvernightSnapshot:
-    """Recorded SOC values for a single day."""
-
-    date: str
-    """ISO date string (YYYY-MM-DD)."""
-
-    soc_2100: float | None = None
-    """Battery SOC (%) recorded at 21:00 — start of overnight period."""
-
-    soc_1100: float | None = None
-    """Battery SOC (%) recorded at 11:00 — end of overnight period."""
-
-    def consumption_kwh(self, capacity_kwh: float) -> float | None:
-        """Calculate overnight consumption in kWh. None if data incomplete."""
-        if self.soc_2100 is None or self.soc_1100 is None:
-            return None
-        delta_pct = self.soc_2100 - self.soc_1100
-        if delta_pct <= 0:
-            # Battery was charged overnight (grid charge or unexpected) — skip
-            return None
-        return (delta_pct / 100.0) * capacity_kwh
 
 
 class OvernightTracker:
-    """Track overnight battery consumption and ZeroHero window energy.
+    """Measure overnight consumption, size the reserve, guard the export.
 
-    Call ``async_load()`` once after instantiation (before the first
-    ``update()`` call) to restore persisted data across HA restarts.
+    Call ``async_load()`` once before the first ``update()``.
     """
 
     def __init__(
@@ -81,22 +52,16 @@ class OvernightTracker:
     ) -> None:
         self._hass = hass
         self.battery_capacity_kwh = battery_capacity_kwh
-        self._store: Store = Store(
-            hass, STORAGE_VERSION, f"{STORAGE_KEY}_{entry_id}"
-        )
-        self._snapshots: list[OvernightSnapshot] = []
+        self._store: Store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{entry_id}")
         self._loaded = False
 
-        # Track which dates we've already recorded snapshots for
-        self._recorded_2100: str | None = None
-        self._recorded_1100: str | None = None
+        self.nights = NightAccumulator()
+        self.export_guard = ExportGuard()
 
-        # ZeroHero / Super Export energy accumulators (reset each day at 18:00)
+        # ZeroHero / Super Export accumulators (reset each day at 18:00)
         self._window_date: str | None = None
         self.zerohero_import_kwh: float = 0.0
         self.super_export_kwh: float = 0.0
-
-        # Previous update bookkeeping for energy integration
         self._prev_update_time: datetime | None = None
 
     # ------------------------------------------------------------------
@@ -104,24 +69,40 @@ class OvernightTracker:
     # ------------------------------------------------------------------
 
     async def async_load(self) -> None:
-        """Load persisted snapshots from HA storage."""
+        """Restore persisted state.
+
+        Data from versions before 1.2.17 (``snapshots``) is discarded on
+        purpose: it paired each day's 21:00 SOC with the *same* morning's
+        11:00 SOC, so it measured the daytime gain, not overnight use.
+        """
         data = await self._store.async_load()
-        if data and isinstance(data, dict):
-            for item in data.get("snapshots", []):
-                try:
-                    self._snapshots.append(
-                        OvernightSnapshot(
-                            date=str(item["date"]),
-                            soc_2100=item.get("soc_2100"),
-                            soc_1100=item.get("soc_1100"),
-                        )
-                    )
-                except (KeyError, TypeError, ValueError):
-                    _LOGGER.warning("Skipping malformed snapshot: %s", item)
-            _LOGGER.debug(
-                "Loaded %d overnight snapshots from storage", len(self._snapshots)
-            )
+        if isinstance(data, dict):
+            self.nights = NightAccumulator.from_dict(data.get("overnight"))
+            zh = data.get("zerohero") or {}
+            self._window_date = zh.get("date")
+            self.zerohero_import_kwh = float(zh.get("import_kwh", 0.0))
+            self.super_export_kwh = float(zh.get("export_kwh", 0.0))
+            if "snapshots" in data and "overnight" not in data:
+                _LOGGER.info(
+                    "Discarding legacy overnight snapshots (measured daytime "
+                    "gain, not overnight use); fallback reserve applies until "
+                    "3 nights are measured"
+                )
         self._loaded = True
+
+    def _data_to_save(self) -> dict[str, Any]:
+        return {
+            "overnight": self.nights.as_dict(),
+            "zerohero": {
+                "date": self._window_date,
+                "import_kwh": self.zerohero_import_kwh,
+                "export_kwh": self.super_export_kwh,
+            },
+        }
+
+    def _schedule_save(self) -> None:
+        # Coalesced write; HA flushes pending delayed saves on shutdown.
+        self._store.async_delay_save(self._data_to_save, SAVE_DELAY_S)
 
     # ------------------------------------------------------------------
     # Per-cycle update
@@ -133,107 +114,101 @@ class OvernightTracker:
         battery_soc_pct: float | None,
         grid_power_w: float | None,
     ) -> None:
-        """Update tracker with current readings. Call once per coordinator cycle.
-
-        Args:
-            now: Current local datetime.
-            battery_soc_pct: Current battery SOC (%).
-            grid_power_w: Grid power in watts. Positive = import, negative = export.
-        """
+        """Feed one cycle of readings. Grid power: positive = import."""
         if not self._loaded:
             return
 
-        today = now.date().isoformat()
+        was_active = self.nights.active is not None
+        finished = self.nights.update(now, battery_soc_pct, grid_power_w)
+        if finished is not None:
+            self._log_night(finished)
+        if was_active or self.nights.active is not None or finished is not None:
+            self._schedule_save()
+
         current_time = now.timetz().replace(tzinfo=None)
+        if self._update_energy_window(now, now.date().isoformat(), current_time, grid_power_w):
+            self._schedule_save()
 
-        # ── SOC snapshots ─────────────────────────────────────────────
-        if battery_soc_pct is not None:
-            if (
-                SNAPSHOT_2100_START <= current_time < SNAPSHOT_2100_END
-                and self._recorded_2100 != today
-            ):
-                self._record_snapshot(today, soc_2100=battery_soc_pct)
-                self._recorded_2100 = today
-
-            if (
-                SNAPSHOT_1100_START <= current_time < SNAPSHOT_1100_END
-                and self._recorded_1100 != today
-            ):
-                self._record_snapshot(today, soc_1100=battery_soc_pct)
-                self._recorded_1100 = today
-
-        # ── ZeroHero / Super Export energy tracking ───────────────────
-        self._update_energy_window(now, today, current_time, grid_power_w)
+    def export_allowed(
+        self,
+        now: datetime,
+        battery_soc_pct: float | None,
+        house_w: float | None,
+        reserve: int,
+    ) -> bool:
+        """Whether the evening export may continue this cycle."""
+        allowed = self.export_guard.update(
+            now, battery_soc_pct, house_w, reserve, self.battery_capacity_kwh
+        )
+        return allowed
 
     # ------------------------------------------------------------------
     # Calculations
     # ------------------------------------------------------------------
 
+    def _recent(self, days: int) -> list[float]:
+        return self.nights.consumptions(self.battery_capacity_kwh, days)
+
     def average_overnight_consumption_kwh(self, days: int = 14) -> float | None:
-        """Rolling N-day average overnight consumption in kWh.
-
-        Returns ``None`` if fewer than 2 complete snapshots are available.
-        """
-        complete = [
-            s for s in self._snapshots
-            if s.soc_2100 is not None and s.soc_1100 is not None
-        ]
-        if len(complete) < 2:
+        """Mean of the last ``days`` measured nights (informational)."""
+        recent = self._recent(days)
+        if not recent:
             return None
+        return round(sum(recent) / len(recent), 2)
 
-        # Sort by date descending, take the last `days` complete snapshots
-        complete.sort(key=lambda s: s.date, reverse=True)
-        recent = complete[:days]
+    def design_overnight_kwh(self, days: int = 14) -> float | None:
+        """Energy the reserve is sized for (a heavy recent night)."""
+        value = design_night_kwh(self._recent(days))
+        return None if value is None else round(value, 2)
 
-        consumptions = [
-            c for s in recent
-            if (c := s.consumption_kwh(self.battery_capacity_kwh)) is not None
-        ]
-        if not consumptions:
-            return None
-
-        return round(sum(consumptions) / len(consumptions), 2)
+    def last_night_kwh(self) -> float | None:
+        recent = self._recent(1)
+        return round(recent[0], 2) if recent else None
 
     def calculate_reserve_pct(
         self,
         margin_pct: float = 20.0,
         days: int = 14,
     ) -> int | None:
-        """Recommended SOC reserve % to set in inverter slots 1 and 6.
-
-        Applies a safety margin on top of the rolling average and clamps
-        the result between 10 % and 60 %.
-
-        Returns ``None`` if not enough historical data yet.
-        """
-        avg_kwh = self.average_overnight_consumption_kwh(days)
-        if avg_kwh is None:
+        """SOC % to keep for the night, or None until enough nights exist."""
+        design = design_night_kwh(self._recent(days))
+        if design is None:
             return None
-
-        required_kwh = avg_kwh * (1.0 + margin_pct / 100.0)
-        reserve_pct = (required_kwh / self.battery_capacity_kwh) * 100.0
-        return int(max(10.0, min(60.0, reserve_pct)))
+        return reserve_pct(design, self.battery_capacity_kwh, margin_pct)
 
     @property
     def zerohero_eligible(self) -> bool:
-        """True if we are on track to earn the ZeroHero $1/day credit.
-
-        Condition: total grid import during 6pm–9pm ≤ 0.09 kWh.
-        Only meaningful during or after the current window.
-        """
+        """True while grid import in 18:00–21:00 is within the 0.09 kWh limit."""
         return self.zerohero_import_kwh <= ZEROHERO_MAX_IMPORT_KWH
 
     @property
     def snapshot_count(self) -> int:
-        """Number of complete (both values present) overnight snapshots."""
-        return sum(
-            1 for s in self._snapshots
-            if s.soc_2100 is not None and s.soc_1100 is not None
-        )
+        """Number of valid measured nights stored."""
+        return len(self._recent(10_000))
 
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _log_night(self, night: NightRecord) -> None:
+        used = night.consumption_kwh(self.battery_capacity_kwh)
+        if used is not None:
+            _LOGGER.info(
+                "Night %s: %.2f kWh (SOC %.1f%% → %.1f%%, import %.2f kWh, "
+                "export %.2f kWh)",
+                night.date,
+                used,
+                night.soc_start,
+                night.soc_end,
+                night.import_kwh,
+                night.export_kwh,
+            )
+        else:
+            _LOGGER.warning(
+                "Night %s not used for reserve sizing: %s",
+                night.date,
+                night.reason or "implausible reading",
+            )
 
     def _update_energy_window(
         self,
@@ -241,98 +216,35 @@ class OvernightTracker:
         today: str,
         current_time: time,
         grid_power_w: float | None,
-    ) -> None:
-        """Accumulate grid import/export energy during the ZeroHero window."""
+    ) -> bool:
+        """Accumulate grid energy in the ZeroHero window. Returns True if changed."""
         in_window = ZEROHERO_WINDOW_START <= current_time < ZEROHERO_WINDOW_END
+        changed = False
 
-        # Reset accumulators at the start of each day's window
         if self._window_date != today and in_window:
             self.zerohero_import_kwh = 0.0
             self.super_export_kwh = 0.0
             self._window_date = today
-            _LOGGER.debug("ZeroHero window reset for %s", today)
+            changed = True
         elif self._window_date != today and current_time >= ZEROHERO_WINDOW_END:
-            # Past today's window — mark so we don't reset tomorrow prematurely
             self._window_date = today
 
-        # Integrate energy only inside the window
         if (
             in_window
             and self._prev_update_time is not None
             and grid_power_w is not None
         ):
             elapsed_h = (now - self._prev_update_time).total_seconds() / 3600.0
-            # Sanity-check: ignore gaps > 5 minutes (HA restart, etc.)
             if 0 < elapsed_h < (5 / 60):
                 if grid_power_w > 0:
                     self.zerohero_import_kwh += (grid_power_w / 1000.0) * elapsed_h
+                    changed = True
                 elif grid_power_w < 0:
-                    # Export (negative grid power)
                     exported = (-grid_power_w / 1000.0) * elapsed_h
                     self.super_export_kwh = min(
                         self.super_export_kwh + exported, SUPER_EXPORT_MAX_KWH
                     )
+                    changed = True
 
         self._prev_update_time = now
-
-    def _record_snapshot(
-        self,
-        date_str: str,
-        soc_2100: float | None = None,
-        soc_1100: float | None = None,
-    ) -> None:
-        """Record or update a SOC snapshot for the given date."""
-        for snap in self._snapshots:
-            if snap.date == date_str:
-                if soc_2100 is not None:
-                    snap.soc_2100 = soc_2100
-                if soc_1100 is not None:
-                    snap.soc_1100 = soc_1100
-                _LOGGER.info(
-                    "Updated snapshot %s: soc_2100=%s%% soc_1100=%s%%",
-                    date_str,
-                    snap.soc_2100,
-                    snap.soc_1100,
-                )
-                self._schedule_save()
-                return
-
-        # New date
-        new_snap = OvernightSnapshot(
-            date=date_str,
-            soc_2100=soc_2100,
-            soc_1100=soc_1100,
-        )
-        self._snapshots.append(new_snap)
-
-        # Prune to most recent MAX_STORED_DAYS
-        if len(self._snapshots) > MAX_STORED_DAYS:
-            self._snapshots.sort(key=lambda s: s.date)
-            self._snapshots = self._snapshots[-MAX_STORED_DAYS:]
-
-        _LOGGER.info(
-            "Recorded new snapshot %s: soc_2100=%s%% soc_1100=%s%%",
-            date_str,
-            soc_2100,
-            soc_1100,
-        )
-        self._schedule_save()
-
-    def _schedule_save(self) -> None:
-        """Fire-and-forget save to persistent storage."""
-        self._hass.async_create_task(self._async_save())
-
-    async def _async_save(self) -> None:
-        """Persist snapshots to HA storage."""
-        await self._store.async_save(
-            {
-                "snapshots": [
-                    {
-                        "date": s.date,
-                        "soc_2100": s.soc_2100,
-                        "soc_1100": s.soc_1100,
-                    }
-                    for s in self._snapshots
-                ]
-            }
-        )
+        return changed

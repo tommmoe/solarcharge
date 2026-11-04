@@ -423,8 +423,25 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 or fallback_reserve
             )
 
+            # House load = battery discharge + PV + grid (grid < 0 when
+            # exporting). battery_power_w is charging-positive here.
+            house_w: float | None = None
+            if battery_power_w is not None and grid_power_w is not None:
+                house_w = max(
+                    0.0, -battery_power_w + (pv_power_w or 0.0) + grid_power_w
+                )
+            export_allowed = self.overnight_tracker.export_allowed(
+                now=now,
+                battery_soc_pct=battery_soc_pct,
+                house_w=house_w,
+                reserve=overnight_reserve_pct,
+            )
+
             inverter_slots = calculate_inverter_schedule(
-                InverterScheduleInputs(overnight_reserve_pct=overnight_reserve_pct)
+                InverterScheduleInputs(
+                    overnight_reserve_pct=overnight_reserve_pct,
+                    export_allowed=export_allowed,
+                )
             )
             await self.inverter_controller.async_apply_schedule(inverter_slots)
 
@@ -439,6 +456,21 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         )
                     ),
                     "overnight_reserve_pct": overnight_reserve_pct,
+                    "overnight_reserve_is_fallback": (
+                        self.overnight_tracker.calculate_reserve_pct(
+                            margin_pct=reserve_margin, days=reserve_days
+                        )
+                        is None
+                    ),
+                    "overnight_design_kwh": (
+                        self.overnight_tracker.design_overnight_kwh(reserve_days)
+                    ),
+                    "overnight_last_night_kwh": (
+                        self.overnight_tracker.last_night_kwh()
+                    ),
+                    "export_stop_soc": self.overnight_tracker.export_guard.last_stop_soc,
+                    "export_allowed": export_allowed,
+                    "house_power_w": house_w,
                     "overnight_snapshot_count": self.overnight_tracker.snapshot_count,
                     "zerohero_import_kwh": round(
                         self.overnight_tracker.zerohero_import_kwh, 4
