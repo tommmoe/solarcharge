@@ -31,6 +31,9 @@ LOAD_LIMIT_ALLOW_EXPORT = "Allow Export"
 LOAD_LIMIT_ESSENTIALS = "Essentials"
 LOAD_LIMIT_ZERO_EXPORT = "Zero Export"
 
+OVERNIGHT_FLOOR_PCT = 10
+"""Lowest SOC the overnight slots discharge to. Deye shutdown is 7 %."""
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -81,17 +84,26 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
     """Return 6 Deye program slots optimised for GloBird Zero Hero.
 
     Slots are returned in ascending start-time order (prog1 → prog6).
-    The overnight_reserve_pct is clamped to 8–60 % before use.
+    ``overnight_reserve_pct`` is the SOC the house *uses* overnight
+    (21:00 → 11:00, with margin), not a floor. It is stacked on top of
+    OVERNIGHT_FLOOR_PCT to give the 18:00 export floor, so the battery stops
+    exporting with enough left for the night. The overnight slots then run
+    down to OVERNIGHT_FLOOR_PCT.
+
+    Using the reserve as the overnight floor (as before) meant a night that
+    exported down to it left the battery locked at that SOC and the house on
+    grid until 11:00.
     """
     reserve = max(8, min(60, inputs.overnight_reserve_pct))
+    export_floor = min(OVERNIGHT_FLOOR_PCT + reserve, 70)
 
     return [
         # ── Slot 1 ── Midnight → 11am ─────────────────────────────────────
-        # Coast overnight on battery. Keep SOC above the calculated reserve.
+        # Coast overnight on battery, down to the hard floor.
         InverterSlot(
             start_time=time(0, 0),
             charge_mode=CHARGE_NO_GRID,
-            capacity_pct=reserve,
+            capacity_pct=OVERNIGHT_FLOOR_PCT,
             power_w=12000,
             load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
@@ -101,7 +113,7 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
         InverterSlot(
             start_time=time(9, 0),
             charge_mode=CHARGE_NO_GRID,
-            capacity_pct=reserve,
+            capacity_pct=OVERNIGHT_FLOOR_PCT,
             power_w=12000,
             load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
@@ -126,7 +138,8 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
         # ── Slot 5 ── 6pm → 9pm ───────────────────────────────────────────
         # ZeroHero + Super Export window.
         #   • Allow Export → battery pushes power to grid
-        #   • 8% floor → maximise energy available for export
+        #   • Floor = overnight floor + overnight need → export as much as
+        #     possible while still reaching 11:00 on battery
         #   • Earning up to 15c + 5c = 20c/kWh on first 15 kWh exported
         #   • Keeping grid import ≤ 0.09 kWh total earns the $1/day credit
         #   • sell=True is required: without the slot's sell flag the battery
@@ -134,18 +147,18 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
         InverterSlot(
             start_time=time(18, 0),
             charge_mode=CHARGE_NO_GRID,
-            capacity_pct=reserve,
+            capacity_pct=export_floor,
             power_w=12000,
             load_limit=LOAD_LIMIT_ALLOW_EXPORT,
             sell=True,
         ),
         # ── Slot 6 ── 9pm → midnight ──────────────────────────────────────
-        # Export window closed. Lock in the overnight reserve so the battery
-        # survives to 11am tomorrow without grid imports.
+        # Export window closed. Battery carries the house overnight, down to
+        # the hard floor; the export floor above left enough for this.
         InverterSlot(
             start_time=time(21, 0),
             charge_mode=CHARGE_NO_GRID,
-            capacity_pct=reserve,
+            capacity_pct=OVERNIGHT_FLOOR_PCT,
             power_w=12000,
             load_limit=LOAD_LIMIT_ZERO_EXPORT,
         ),
