@@ -137,3 +137,56 @@ def test_round_trip():
     again = bm.BillAccumulator.from_dict(acc.as_dict())
     again.update(dt(8, 12, 2), 100.7, 50.0, None, None)
     assert again.day(date(2026, 11, 8)).import_offpeak_kwh == pytest.approx(0.7)
+
+
+def test_backfill_whole_past_day():
+    acc = bm.BillAccumulator()
+    hours = [(dt(7, h), 1.0, 0.5) for h in range(24)]
+    assert acc.backfill_day(date(2026, 11, 7), hours, 0.0, dt(8, 9))
+    day = acc.day(date(2026, 11, 7))
+    assert day.import_offpeak_kwh == pytest.approx(3.0)
+    assert day.import_peak_kwh == pytest.approx(7.0)
+    assert day.import_shoulder_kwh == pytest.approx(14.0)
+    assert day.export_window_kwh == pytest.approx(1.5)
+    assert day.export_peak_kwh == pytest.approx(3.5)
+    assert day.bill(T)["zerohero"] == 1.0
+    # second run is a no-op
+    assert not acc.backfill_day(date(2026, 11, 7), hours, 0.0, dt(8, 9))
+    assert day.import_kwh == pytest.approx(24.0)
+
+
+def test_backfill_stops_where_live_tracking_began():
+    acc = bm.BillAccumulator()
+    acc.update(dt(8, 22, 45), 100.0, 50.0, None, None)  # live from 22:45
+    acc.update(dt(8, 22, 46), 100.1, 50.0, None, None)
+    hours = [(dt(8, h), 1.0, 0.0) for h in range(23)]  # through 22:00-23:00
+    acc.backfill_day(date(2026, 11, 8), hours, 0.5, dt(8, 23, 5))
+    day = acc.day(date(2026, 11, 8))
+    # 16..21 full peak hours (6) + 0.75 of 22:00 + live 0.1
+    assert day.import_peak_kwh == pytest.approx(6.75 + 0.1)
+    assert day.zerohero(T) is False
+
+
+def test_legacy_day_cleared_on_load():
+    acc = bm.BillAccumulator()
+    acc.update(dt(8, 22, 45), 100.0, 50.0, None, None)
+    acc.update(dt(8, 22, 46), 100.3, 50.0, None, None)
+    data = acc.as_dict()
+    for d in data["days"]:
+        del d["tracked_from"]
+        del d["backfilled"]
+    again = bm.BillAccumulator.from_dict(data)
+    assert again.day(date(2026, 11, 8)).import_kwh == 0
+    assert again.day(date(2026, 11, 8)).tracked_from is None
+
+
+def test_tracked_from_uses_baseline_after_short_restart():
+    acc = bm.BillAccumulator()
+    acc.update(dt(8, 22, 40), 100.0, 50.0, None, None)
+    data = acc.as_dict()
+    data["days"] = []
+    again = bm.BillAccumulator.from_dict(data)
+    again.update(dt(8, 22, 50), 100.2, 50.0, None, None)
+    day = again.day(date(2026, 11, 8))
+    assert day.tracked_from == dt(8, 22, 40).isoformat()
+    assert day.import_peak_kwh == pytest.approx(0.2)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime, timedelta, time
+from datetime import date, datetime, timedelta, time
 import logging
 from typing import Any
 
@@ -143,6 +143,37 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.session_tracker.async_load()
         await self.billing_tracker.async_load()
         await super().async_config_entry_first_refresh()
+        # After the first cycle, so today's live start time is known.
+        self.entry.async_create_background_task(
+            self.hass,
+            self.async_backfill_bill(dt_util.now().date().replace(day=1)),
+            "solar_charge_bill_backfill",
+        )
+
+    async def async_backfill_bill(self, start: date) -> dict[str, Any]:
+        """Fill the bill estimate from recorder statistics since ``start``."""
+        try:
+            result = await self.billing_tracker.async_backfill(
+                self.hass,
+                start,
+                dt_util.now(),
+                self._energy_entity(CONF_GRID_IMPORT_ENERGY_ENTITY, "total_grid_import"),
+                self._energy_entity(CONF_GRID_EXPORT_ENERGY_ENTITY, "total_grid_export"),
+                self._own_entity_id("sensor", "grid_import"),
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Bill backfill failed: %s", err)
+            return {"backfilled": [], "reason": str(err)}
+        if result.get("backfilled"):
+            await self.async_request_refresh()
+        return result
+
+    def _own_entity_id(self, domain: str, key: str) -> str | None:
+        from homeassistant.helpers import entity_registry as er
+
+        return er.async_get(self.hass).async_get_entity_id(
+            domain, DOMAIN, f"{self.entry.entry_id}_{key}"
+        )
 
     def refresh_settings(self) -> None:
         """Refresh cached merged settings from config entry data and options."""
@@ -570,15 +601,19 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except (TypeError, ValueError):
             return None
 
+    def _energy_entity(self, option: str, deye_suffix: str) -> str | None:
+        entity_id = self._settings.get(option)
+        prefix = self._settings.get(CONF_DEYE_ENTITY_PREFIX)
+        if not entity_id and prefix:
+            entity_id = f"sensor.{prefix}_{deye_suffix}"
+        return entity_id or None
+
     def _energy_kwh(self, option: str, deye_suffix: str) -> float | None:
         """Read a cumulative grid energy counter in kWh.
 
         Uses the configured entity, else ``sensor.<deye prefix>_<suffix>``.
         """
-        entity_id = self._settings.get(option)
-        prefix = self._settings.get(CONF_DEYE_ENTITY_PREFIX)
-        if not entity_id and prefix:
-            entity_id = f"sensor.{prefix}_{deye_suffix}"
+        entity_id = self._energy_entity(option, deye_suffix)
         state = self._state(entity_id)
         value = self._numeric_state(state)
         if value is None or state is None:

@@ -61,3 +61,14 @@ cancel_snooze:
     entity:
       integration: solar_charge
       domain: select
+
+backfill_bill:
+  fields:
+    start_date:
+      required: false
+      selector:
+        date:
+    entry_id:
+      required: false
+      selector:
+        text:

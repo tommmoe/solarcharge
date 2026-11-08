@@ -23,7 +23,7 @@ No Home Assistant imports, so it is unit-testable on its own.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from typing import Any
 
 PEAK_START = time(16, 0)
@@ -92,6 +92,8 @@ class DayUsage:
     window_import_kwh: float | None = None  # None: window not observed
     window_closed: bool = False
     skipped_kwh: float = 0.0
+    tracked_from: str | None = None  # first live reading (ISO); earlier = backfill
+    backfilled: bool = False
 
     @property
     def import_kwh(self) -> float:
@@ -215,6 +217,19 @@ class BillAccumulator:
         t = now.timetz().replace(tzinfo=None)
         changed = self._close_past_days(now.date())
         today = self.day(now.date())
+        if today.tracked_from is None:
+            # Live data covers from the counter baseline when this cycle's
+            # delta will be counted (short restart), else from now.
+            base_at = self._base.at
+            start = now
+            if (
+                base_at is not None
+                and base_at.date() == now.date()
+                and 0 < (now - base_at).total_seconds() <= MAX_COUNTER_GAP_S
+            ):
+                start = base_at
+            today.tracked_from = start.isoformat()
+            changed = True
 
         imported, exported = self._counter_delta(now, import_total_kwh, export_total_kwh)
         if imported is None and exported is None:
@@ -309,6 +324,55 @@ class BillAccumulator:
         kwh = grid_power_w / 1000 * elapsed_h
         return (kwh, 0.0) if kwh > 0 else (0.0, -kwh)
 
+    def add_hour(self, day: DayUsage, start: datetime, imported: float, exported: float) -> None:
+        """Book one hour of counter change at the rates of its start time."""
+        t = start.timetz().replace(tzinfo=None)
+        period = import_period(t)
+        setattr(day, f"import_{period}_kwh", getattr(day, f"import_{period}_kwh") + imported)
+        if PEAK_START <= t < PEAK_END:
+            day.export_peak_kwh += exported
+        else:
+            day.export_other_kwh += exported
+        if in_window(t):
+            day.export_window_kwh += exported
+
+    def backfill_day(
+        self,
+        day_date: date,
+        hours: list[tuple[datetime, float, float]],
+        window_import_kwh: float | None,
+        now: datetime,
+    ) -> bool:
+        """Fill a day from recorded hourly counter changes.
+
+        ``hours`` are (hour start, import kWh, export kWh). Only time before
+        live tracking began that day is added (the boundary hour pro rata),
+        so live readings are never counted twice. A day is backfilled once.
+        """
+        day = self.day(day_date)
+        if day.backfilled:
+            return False
+        cutoff = datetime.fromisoformat(day.tracked_from) if day.tracked_from else None
+        for start, imported, exported in hours:
+            if start.date() != day_date or imported < 0 or exported < 0:
+                continue
+            frac = 1.0
+            if cutoff is not None:
+                if start >= cutoff:
+                    continue
+                end = start + timedelta(hours=1)
+                if end > cutoff:
+                    frac = (cutoff - start).total_seconds() / 3600
+            self.add_hour(day, start, imported * frac, exported * frac)
+        window_end = datetime.combine(day_date, WINDOW_END, tzinfo=now.tzinfo)
+        if window_import_kwh is not None and now >= window_end:
+            day.window_import_kwh = window_import_kwh
+            day.window_closed = True
+        if day_date < now.date():
+            day.window_closed = True
+        day.backfilled = True
+        return True
+
     def _close_past_days(self, today: date) -> bool:
         """A day's ZeroHero window is settled once the day is over, even if
         no reading arrived after 21:00 (e.g. HA restarted overnight)."""
@@ -354,6 +418,10 @@ class BillAccumulator:
                 day = DayUsage.from_dict(raw)
             except (TypeError, ValueError):
                 continue
+            if "tracked_from" not in raw:
+                # Written before live start times were recorded: can't be
+                # merged with a backfill safely, so let the backfill rebuild it.
+                day = DayUsage(date=day.date)
             acc.days[day.date] = day
         base = data.get("baseline") or {}
         try:

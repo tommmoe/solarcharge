@@ -10,7 +10,7 @@ import voluptuous as vol
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.loader import async_get_integration
@@ -18,12 +18,14 @@ from homeassistant.loader import async_get_integration
 from .const import (
     ATTR_ENTRY_ID,
     ATTR_MODE,
+    ATTR_START_DATE,
     DOMAIN,
     FRONTEND_CARD_URL,
     FRONTEND_PATH,
     MODES,
     PLATFORMS,
     SERVICE_APPLY_NOW,
+    SERVICE_BACKFILL_BILL,
     SERVICE_FORCE_UPDATE,
     SERVICE_SET_MODE,
     SERVICE_STOP_CHARGING,
@@ -78,7 +80,26 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         for coordinator in await _matching_coordinators(call):
             await coordinator.async_set_config_value(ATTR_MODE, mode)
 
+    async def _handle_backfill_bill(call: ServiceCall) -> ServiceResponse:
+        from homeassistant.util import dt as dt_util
+
+        start = call.data.get(ATTR_START_DATE) or dt_util.now().date().replace(day=1)
+        results = {}
+        for coordinator in await _matching_coordinators(call):
+            results[coordinator.entry.entry_id] = await coordinator.async_backfill_bill(start)
+        return {"results": results}
+
     entry_id_schema = vol.Optional(ATTR_ENTRY_ID)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_BACKFILL_BILL,
+        _handle_backfill_bill,
+        schema=vol.Schema(
+            {entry_id_schema: cv.string, vol.Optional(ATTR_START_DATE): cv.date}
+        ),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
 
     hass.services.async_register(
         DOMAIN,
