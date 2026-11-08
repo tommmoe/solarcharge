@@ -6,7 +6,7 @@ GloBird Zero Hero tariff (Sydney):
   00:00 – 11:00  Shoulder (46.2c)  — coast overnight on battery
   11:00 – 14:00  FREE (0c)         — fill battery from grid
   14:00 – 16:00  Shoulder (46.2c)  — hold charge
-  16:00 – 18:00  Peak (57.2c)      — use battery for house
+  16:00 – 18:00  Peak (52.8c)      — use battery for house
   18:00 – 21:00  Peak + ZeroHero + Super Export — export to grid
   21:00 – 00:00  Peak → Shoulder   — hold overnight reserve
 

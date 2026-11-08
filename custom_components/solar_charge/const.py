@@ -113,6 +113,35 @@ CONF_OVERNIGHT_RESERVE_DAYS = "overnight_reserve_days"
 CONF_OVERNIGHT_RESERVE_FALLBACK_PCT = "overnight_reserve_fallback_pct"
 """Reserve SOC% used until enough historical data is available."""
 
+# ── Bill estimate (GloBird ZeroHero) ──────────────────────────────────────
+CONF_GRID_IMPORT_ENERGY_ENTITY = "grid_import_energy_entity"
+"""Cumulative grid import counter (kWh). Falls back to sensor.<deye prefix>_total_grid_import."""
+CONF_GRID_EXPORT_ENERGY_ENTITY = "grid_export_energy_entity"
+"""Cumulative grid export counter (kWh). Falls back to sensor.<deye prefix>_total_grid_export."""
+
+CONF_TARIFF_SUPPLY_PER_DAY = "tariff_supply_per_day"
+CONF_TARIFF_PEAK_RATE = "tariff_peak_rate"
+CONF_TARIFF_SHOULDER_RATE = "tariff_shoulder_rate"
+CONF_TARIFF_OFFPEAK_RATE = "tariff_offpeak_rate"
+CONF_TARIFF_FEED_IN_PEAK_RATE = "tariff_feed_in_peak_rate"
+CONF_TARIFF_FEED_IN_RATE = "tariff_feed_in_rate"
+CONF_TARIFF_SUPER_EXPORT_RATE = "tariff_super_export_rate"
+CONF_TARIFF_SUPER_EXPORT_CAP_KWH = "tariff_super_export_cap_kwh"
+CONF_TARIFF_ZEROHERO_CREDIT = "tariff_zerohero_credit"
+
+TARIFF_OPTION_FIELDS: dict[str, str] = {
+    CONF_TARIFF_SUPPLY_PER_DAY: "supply_per_day",
+    CONF_TARIFF_PEAK_RATE: "peak_rate",
+    CONF_TARIFF_SHOULDER_RATE: "shoulder_rate",
+    CONF_TARIFF_OFFPEAK_RATE: "offpeak_rate",
+    CONF_TARIFF_FEED_IN_PEAK_RATE: "feed_in_peak_rate",
+    CONF_TARIFF_FEED_IN_RATE: "feed_in_rate",
+    CONF_TARIFF_SUPER_EXPORT_RATE: "super_export_rate",
+    CONF_TARIFF_SUPER_EXPORT_CAP_KWH: "super_export_cap_kwh",
+    CONF_TARIFF_ZEROHERO_CREDIT: "zerohero_credit",
+}
+"""Option key -> billing_model.Tariff field. Rates in $ (GST incl.)."""
+
 DEFAULTS: dict[str, object] = {
     CONF_NAME: DEFAULT_NAME,
     CONF_MODE: MODE_FREE_HOURS_OR_SOLAR,
@@ -149,6 +178,16 @@ DEFAULTS: dict[str, object] = {
     CONF_OVERNIGHT_RESERVE_MARGIN_PCT: 20.0,
     CONF_OVERNIGHT_RESERVE_DAYS: 14,
     CONF_OVERNIGHT_RESERVE_FALLBACK_PCT: 30,
+    # Bill estimate — GloBird ZeroHero, Oct 2026 bill
+    CONF_TARIFF_SUPPLY_PER_DAY: 1.705,
+    CONF_TARIFF_PEAK_RATE: 0.528,
+    CONF_TARIFF_SHOULDER_RATE: 0.418,
+    CONF_TARIFF_OFFPEAK_RATE: 0.0,
+    CONF_TARIFF_FEED_IN_PEAK_RATE: 0.02,
+    CONF_TARIFF_FEED_IN_RATE: 0.0,
+    CONF_TARIFF_SUPER_EXPORT_RATE: 0.08,
+    CONF_TARIFF_SUPER_EXPORT_CAP_KWH: 15.0,
+    CONF_TARIFF_ZEROHERO_CREDIT: 1.0,
 }
 
 POWER_UNIT_AUTO = "auto"

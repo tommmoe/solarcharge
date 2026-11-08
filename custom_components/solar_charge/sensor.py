@@ -211,6 +211,34 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda data: data.get("current_inverter_slot"),
     ),
+    # ── Bill estimate ────────────────────────────────────────────────────
+    SolarChargeSensorDescription(
+        key="bill_today",
+        translation_key="bill_today",
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: (data.get("bill_today") or {}).get("net"),
+        attributes_fn=lambda data: {
+            **(data.get("bill_today") or {}),
+            "yesterday": data.get("bill_yesterday"),
+            "zerohero_today": data.get("bill_zerohero_today"),
+            "skipped_kwh": data.get("bill_skipped_kwh_today"),
+            "tariff": data.get("tariff"),
+        },
+    ),
+    SolarChargeSensorDescription(
+        key="bill_month",
+        translation_key="bill_month",
+        device_class=SensorDeviceClass.MONETARY,
+        state_class=SensorStateClass.TOTAL,
+        suggested_display_precision=2,
+        value_fn=lambda data: (data.get("bill_month") or {}).get("net"),
+        attributes_fn=lambda data: {
+            **(data.get("bill_month") or {}),
+            "history": data.get("bill_history"),
+        },
+    ),
     # ── EV charge session tracking ───────────────────────────────────────
     SolarChargeSensorDescription(
         key="ev_energy_today",
@@ -269,6 +297,8 @@ class SolarChargeSensor(CoordinatorEntity[SolarChargeCoordinator], SensorEntity)
         super().__init__(coordinator)
         self.entity_description = description
         self._attr_unique_id = f"{entry.entry_id}_{description.key}"
+        if description.device_class == SensorDeviceClass.MONETARY:
+            self._attr_native_unit_of_measurement = coordinator.hass.config.currency
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": coordinator.title,

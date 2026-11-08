@@ -77,7 +77,20 @@
   "options": {
     "step": {
       "init": {
-        "title": "Solar Charge options"
+        "title": "Solar Charge options",
+        "data": {
+          "grid_import_energy_entity": "Grid import energy counter (kWh, for bill)",
+          "grid_export_energy_entity": "Grid export energy counter (kWh, for bill)",
+          "tariff_supply_per_day": "Daily supply charge ($/day)",
+          "tariff_peak_rate": "Peak usage 4pm-11pm ($/kWh)",
+          "tariff_shoulder_rate": "Shoulder usage ($/kWh)",
+          "tariff_offpeak_rate": "Off-peak usage 11am-2pm ($/kWh)",
+          "tariff_feed_in_peak_rate": "Feed-in 4pm-11pm ($/kWh)",
+          "tariff_feed_in_rate": "Feed-in 11pm-4pm ($/kWh)",
+          "tariff_super_export_rate": "Super Export top-up 6pm-9pm ($/kWh)",
+          "tariff_super_export_cap_kwh": "Super Export daily cap (kWh)",
+          "tariff_zerohero_credit": "ZeroHero credit ($/day)"
+        }
       }
     }
   },
@@ -108,6 +121,8 @@
       "zerohero_import_kwh": { "name": "ZeroHero import (today)" },
       "super_export_kwh": { "name": "Super export (today)" },
       "current_inverter_slot": { "name": "Active inverter slot" },
+      "bill_today": { "name": "Bill today" },
+      "bill_month": { "name": "Bill this month" },
       "ev_energy_today": { "name": "EV energy (today)" },
       "ev_last_session_energy": { "name": "EV last session energy" },
       "ev_last_charged": { "name": "EV last charged" }

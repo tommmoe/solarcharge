@@ -56,7 +56,11 @@ from .const import (
     CONF_OVERNIGHT_RESERVE_FALLBACK_PCT,
     CONF_OVERNIGHT_RESERVE_MARGIN_PCT,
     CONF_STOP_DELAY_SECONDS,
+    CONF_GRID_EXPORT_ENERGY_ENTITY,
+    CONF_GRID_IMPORT_ENERGY_ENTITY,
+    CONF_TARIFF_SUPER_EXPORT_CAP_KWH,
     CONF_VOLTAGE,
+    TARIFF_OPTION_FIELDS,
     DEFAULTS,
     DOMAIN,
     MODE_NAMES,
@@ -202,6 +206,26 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         values.get(CONF_OVERNIGHT_RESERVE_FALLBACK_PCT), 30
                     ),
                 ): _number_selector(10, 60, 1),
+                # ── Bill estimate ────────────────────────────────────────────
+                vol.Optional(
+                    CONF_GRID_IMPORT_ENERGY_ENTITY,
+                    default=values.get(CONF_GRID_IMPORT_ENERGY_ENTITY) or "",
+                ): _entity_selector("sensor"),
+                vol.Optional(
+                    CONF_GRID_EXPORT_ENERGY_ENTITY,
+                    default=values.get(CONF_GRID_EXPORT_ENERGY_ENTITY) or "",
+                ): _entity_selector("sensor"),
+                **{
+                    vol.Required(
+                        key,
+                        default=_number_default(values.get(key), DEFAULTS[key]),
+                    ): (
+                        _number_selector(0, 100, 0.1)
+                        if key == CONF_TARIFF_SUPER_EXPORT_CAP_KWH
+                        else _number_selector(0, 10, 0.001)
+                    )
+                    for key in TARIFF_OPTION_FIELDS
+                },
             }
         )
 

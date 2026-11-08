@@ -57,6 +57,10 @@ from .const import (
     CONF_NAME,
     CONF_OVERNIGHT_RESERVE_DAYS,
     CONF_OVERNIGHT_RESERVE_FALLBACK_PCT,
+    CONF_DEYE_ENTITY_PREFIX,
+    CONF_GRID_EXPORT_ENERGY_ENTITY,
+    CONF_GRID_IMPORT_ENERGY_ENTITY,
+    TARIFF_OPTION_FIELDS,
     CONF_OVERNIGHT_RESERVE_MARGIN_PCT,
     CONF_PV_POWER_ENTITIES,
     CONF_PV_POWER_MULTIPLIER,
@@ -72,6 +76,8 @@ from .const import (
     POWER_UNIT_KW,
     POWER_UNIT_W,
 )
+from .billing_model import Tariff
+from .billing_tracker import BillingTracker
 from .control import ChargeController
 from .inverter_controller import InverterController
 from .inverter_schedule import (
@@ -117,6 +123,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             float(self._settings.get(CONF_BATTERY_CAPACITY_KWH, 48.0)),
         )
         self.session_tracker = ChargeSessionTracker(hass, entry.entry_id)
+        self.billing_tracker = BillingTracker(hass, entry.entry_id)
 
     @property
     def title(self) -> str:
@@ -134,6 +141,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Load persisted overnight data before first update cycle."""
         await self.overnight_tracker.async_load()
         await self.session_tracker.async_load()
+        await self.billing_tracker.async_load()
         await super().async_config_entry_first_refresh()
 
     def refresh_settings(self) -> None:
@@ -407,6 +415,20 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 grid_power_w=grid_power_w,
             )
 
+            # ── Bill estimate ─────────────────────────────────────────
+            self.billing_tracker.update(
+                now=now,
+                import_total_kwh=self._energy_kwh(
+                    CONF_GRID_IMPORT_ENERGY_ENTITY, "total_grid_import"
+                ),
+                export_total_kwh=self._energy_kwh(
+                    CONF_GRID_EXPORT_ENERGY_ENTITY, "total_grid_export"
+                ),
+                grid_power_w=grid_power_w if grid_sensor_ok else None,
+                zerohero_import_kwh=self.overnight_tracker.zerohero_import_kwh,
+            )
+            data.update(self.billing_tracker.summary(now, self._tariff()))
+
             # ── Inverter schedule calculation + application ───────────
             reserve_days = int(self._settings.get(CONF_OVERNIGHT_RESERVE_DAYS, 14))
             reserve_margin = float(
@@ -547,6 +569,38 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return float(state.state) * multiplier
         except (TypeError, ValueError):
             return None
+
+    def _energy_kwh(self, option: str, deye_suffix: str) -> float | None:
+        """Read a cumulative grid energy counter in kWh.
+
+        Uses the configured entity, else ``sensor.<deye prefix>_<suffix>``.
+        """
+        entity_id = self._settings.get(option)
+        prefix = self._settings.get(CONF_DEYE_ENTITY_PREFIX)
+        if not entity_id and prefix:
+            entity_id = f"sensor.{prefix}_{deye_suffix}"
+        state = self._state(entity_id)
+        value = self._numeric_state(state)
+        if value is None or state is None:
+            return None
+        unit = str(state.attributes.get("unit_of_measurement") or "kWh")
+        if unit == "Wh":
+            value /= 1000
+        elif unit == "MWh":
+            value *= 1000
+        return value
+
+    def _tariff(self) -> Tariff:
+        values: dict[str, float] = {}
+        for option, field_name in TARIFF_OPTION_FIELDS.items():
+            raw = self._settings.get(option)
+            if raw is None or raw == "":
+                continue
+            try:
+                values[field_name] = float(raw)
+            except (TypeError, ValueError):
+                continue
+        return Tariff(**values)
 
     def _sum_states(self, entity_ids: list[str], multiplier: float) -> float | None:
         total = 0.0

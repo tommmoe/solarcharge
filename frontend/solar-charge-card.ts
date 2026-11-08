@@ -160,18 +160,54 @@ const MODE_OPTIONS = [
 
 // GloBird Zero Hero tariff periods
 type TariffPeriod = { start: number; end: number; label: string; color: string; cost: string };
-const TARIFF_PERIODS: TariffPeriod[] = [
-  { start: 0,  end: 11, label: "Shoulder",    color: "#4b5563", cost: "46.2c" },
-  { start: 11, end: 14, label: "Free ☀️",     color: "#16a34a", cost: "FREE" },
-  { start: 14, end: 16, label: "Shoulder",    color: "#4b5563", cost: "46.2c" },
-  { start: 16, end: 18, label: "Peak",        color: "#b45309", cost: "57.2c" },
-  { start: 18, end: 21, label: "⚡ Export",   color: "#7c3aed", cost: "20c*" },
-  { start: 21, end: 23, label: "Peak",        color: "#b45309", cost: "57.2c" },
-  { start: 23, end: 24, label: "Shoulder",    color: "#4b5563", cost: "46.2c" },
-];
+// Rates in $ (GST incl.). Defaults from the Oct 2026 bill; the integration's
+// bill sensor publishes the configured rates in its `tariff` attribute.
+type TariffRates = {
+  peak_rate: number; shoulder_rate: number; offpeak_rate: number;
+  feed_in_peak_rate: number; super_export_rate: number; super_export_cap_kwh: number;
+  zerohero_credit: number;
+};
+const DEFAULT_RATES: TariffRates = {
+  peak_rate: 0.528, shoulder_rate: 0.418, offpeak_rate: 0,
+  feed_in_peak_rate: 0.02, super_export_rate: 0.08, super_export_cap_kwh: 15,
+  zerohero_credit: 1,
+};
 
-function currentPeriod(hour: number): TariffPeriod {
-  return TARIFF_PERIODS.find(p => hour >= p.start && hour < p.end) ?? TARIFF_PERIODS[0];
+function fmtRate(dollars: number): string {
+  if (!dollars) return "FREE";
+  const c = dollars * 100;
+  return `${Math.abs(c - Math.round(c)) < 0.05 ? Math.round(c) : c.toFixed(1)}c`;
+}
+
+function tariffPeriods(r: TariffRates = DEFAULT_RATES): TariffPeriod[] {
+  const shoulder = fmtRate(r.shoulder_rate);
+  const peak = fmtRate(r.peak_rate);
+  return [
+    { start: 0,  end: 11, label: "Shoulder",  color: "#4b5563", cost: shoulder },
+    { start: 11, end: 14, label: "Free ☀️",   color: "#16a34a", cost: fmtRate(r.offpeak_rate) },
+    { start: 14, end: 16, label: "Shoulder",  color: "#4b5563", cost: shoulder },
+    { start: 16, end: 18, label: "Peak",      color: "#b45309", cost: peak },
+    { start: 18, end: 21, label: "⚡ Export", color: "#7c3aed", cost: peak },
+    { start: 21, end: 23, label: "Peak",      color: "#b45309", cost: peak },
+    { start: 23, end: 24, label: "Shoulder",  color: "#4b5563", cost: shoulder },
+  ];
+}
+const TARIFF_PERIODS = tariffPeriods();
+
+function currentPeriod(hour: number, periods: TariffPeriod[] = TARIFF_PERIODS): TariffPeriod {
+  return periods.find(p => hour >= p.start && hour < p.end) ?? periods[0];
+}
+
+type BillTotals = {
+  spent?: number; earned?: number; net?: number; supply?: number;
+  usage_peak?: number; usage_shoulder?: number; usage_offpeak?: number;
+  feed_in?: number; super_export?: number; zerohero?: number;
+  import_kwh?: number; export_kwh?: number; zerohero_days?: number; days?: number;
+};
+
+function fmtMoney(v: number | undefined): string {
+  if (v == null || !Number.isFinite(v)) return "—";
+  return `${v < 0 ? "−" : ""}$${Math.abs(v).toFixed(2)}`;
 }
 
 // ── Power-flow diagram geometry (SVG viewBox 0 0 360 300) ──────────────────
@@ -704,7 +740,7 @@ class SolarChargeCard extends HTMLElement {
 type TariffEntityKey =
   | "zeroheroEligible" | "zeroheroImportKwh" | "superExportKwh"
   | "overnightAvgConsumption" | "overnightReservePct" | "overnightSnapshotCount"
-  | "batterySoc" | "currentInverterSlot" | "status";
+  | "batterySoc" | "currentInverterSlot" | "status" | "billToday" | "billMonth";
 
 type TariffCardConfig = {
   type: string;
@@ -724,6 +760,8 @@ const TARIFF_SUFFIXES: Record<TariffEntityKey, [string, string]> = {
   overnightSnapshotCount:  ["sensor",        "overnight_snapshot_count"],
   batterySoc:              ["sensor",        "battery_soc"],
   currentInverterSlot:     ["sensor",        "current_inverter_slot"],
+  billToday:               ["sensor",        "bill_today"],
+  billMonth:               ["sensor",        "bill_month"],
 };
 
 class SolarChargeTariffCard extends HTMLElement {
@@ -778,7 +816,14 @@ class SolarChargeTariffCard extends HTMLElement {
     const ent = this._ent();
     const now = new Date();
     const nowH = now.getHours() + now.getMinutes() / 60;
-    const period = currentPeriod(nowH);
+    const todayState = this._s(ent.billToday);
+    const monthState = this._s(ent.billMonth);
+    const rates: TariffRates = {
+      ...DEFAULT_RATES,
+      ...((todayState?.attributes?.tariff as Partial<TariffRates> | undefined) ?? {}),
+    };
+    const periods = tariffPeriods(rates);
+    const period = currentPeriod(nowH, periods);
     const capKwh = this._config.battery_capacity_kwh ?? 48;
 
     const zeroheroOk   = isOn(this._s(ent.zeroheroEligible));
@@ -794,10 +839,12 @@ class SolarChargeTariffCard extends HTMLElement {
     const inFreeWindow   = nowH >= 11 && nowH < 14;
 
     // Next period countdown
-    const nextPeriodStart = TARIFF_PERIODS.find(p => p.start > nowH)?.start
-      ?? TARIFF_PERIODS[0].start + 24;
+    const nextPeriodStart = periods.find(p => p.start > nowH)?.start
+      ?? periods[0].start + 24;
     const minsToNext = Math.round((nextPeriodStart - nowH) * 60);
-    const nextLabel = TARIFF_PERIODS.find(p => p.start === nextPeriodStart % 24)?.label ?? "";
+    const nextLabel = periods.find(p => p.start === nextPeriodStart % 24)?.label ?? "";
+    const superRate = rates.feed_in_peak_rate + rates.super_export_rate;
+    const superCap = rates.super_export_cap_kwh;
 
     this.shadowRoot.innerHTML = `
       <style>${TARIFF_CSS}</style>
@@ -811,7 +858,7 @@ class SolarChargeTariffCard extends HTMLElement {
         </header>
 
         <section class="timeline-wrap">
-          ${this._renderTimeline(nowH)}
+          ${this._renderTimeline(nowH, periods)}
           <div class="next-period">
             Next: <strong>${escapeHtml(nextLabel)}</strong>
             in ${Math.floor(minsToNext / 60)}h ${minsToNext % 60}m
@@ -823,7 +870,7 @@ class SolarChargeTariffCard extends HTMLElement {
           <!-- ZeroHero -->
           <div class="panel ${inExportWindow ? (zeroheroOk ? "panel-ok" : "panel-warn") : "panel-dim"}">
             <div class="panel-title">🏆 ZeroHero Credit</div>
-            <div class="panel-sub">$1/day if imports ≤ 0.09 kWh (6pm–9pm)</div>
+            <div class="panel-sub">${fmtMoney(rates.zerohero_credit)}/day if imports ≤ 0.09 kWh (6pm–9pm)</div>
             ${inExportWindow ? `
               <div class="bar-wrap">
                 <div class="bar-track">
@@ -843,23 +890,29 @@ class SolarChargeTariffCard extends HTMLElement {
           <!-- Super Export -->
           <div class="panel ${inExportWindow ? "panel-purple" : "panel-dim"}">
             <div class="panel-title">⚡ Super Export</div>
-            <div class="panel-sub">15c/kWh on first 15 kWh (6pm–9pm)</div>
+            <div class="panel-sub">${fmtRate(superRate)}/kWh on first ${superCap} kWh (6pm–9pm)</div>
             ${inExportWindow || superExport > 0 ? `
               <div class="bar-wrap">
                 <div class="bar-track">
                   <div class="bar-fill purple"
-                    style="width:${Math.min(100, (superExport / 15) * 100).toFixed(1)}%"></div>
+                    style="width:${Math.min(100, (superExport / superCap) * 100).toFixed(1)}%"></div>
                 </div>
-                <span class="bar-val">${superExport.toFixed(2)} / 15 kWh</span>
+                <span class="bar-val">${superExport.toFixed(2)} / ${superCap} kWh</span>
               </div>
               <div class="panel-status purple">
-                ≈ $${(superExport * 0.20).toFixed(2)} earned
+                ≈ ${fmtMoney(Math.min(superExport, superCap) * superRate)} earned
               </div>` :
               `<div class="panel-status dim">${nowH < 18 ? "Starts at 6pm" : "No data yet"}</div>`
             }
           </div>
 
         </section>
+
+        ${todayState || monthState ? this._renderBill(
+          todayState?.attributes as BillTotals | undefined,
+          todayState?.attributes?.yesterday as BillTotals | undefined,
+          monthState?.attributes as BillTotals | undefined,
+        ) : ""}
 
         <section class="overnight-section">
           <div class="panel-title">🔋 Overnight Reserve</div>
@@ -891,9 +944,46 @@ class SolarChargeTariffCard extends HTMLElement {
       </article>`;
   }
 
-  private _renderTimeline(nowH: number): string {
+  private _renderBill(
+    today: BillTotals | undefined,
+    yesterday: BillTotals | undefined,
+    month: BillTotals | undefined,
+  ): string {
+    const stat = (label: string, b: BillTotals | undefined) => {
+      const net = b?.net;
+      const cls = net == null ? "" : net < 0 ? "credit" : "owed";
+      return `
+        <div class="bill-stat">
+          <span class="ov-lbl">${label}</span>
+          <span class="bill-net ${cls}">${fmtMoney(net)}</span>
+          <span class="bill-row"><span>Spent</span><strong>${fmtMoney(b?.spent)}</strong></span>
+          <span class="bill-row"><span>Earned</span><strong class="credit">${fmtMoney(b?.earned)}</strong></span>
+        </div>`;
+    };
+    const m = month ?? {};
+    const usage = (m.usage_peak ?? 0) + (m.usage_shoulder ?? 0) + (m.usage_offpeak ?? 0);
+    return `
+      <section class="overnight-section">
+        <div class="panel-title">💵 Bill estimate</div>
+        <div class="bill-grid">
+          ${stat("Today", today)}
+          ${stat("Yesterday", yesterday)}
+          ${stat("This month", month)}
+        </div>
+        ${month ? `
+        <div class="bill-breakdown">
+          <span>Supply <strong>${fmtMoney(m.supply)}</strong></span>
+          <span>Usage <strong>${fmtMoney(usage)}</strong> · ${fmtKwh(m.import_kwh, 1)}</span>
+          <span>Feed-in <strong class="credit">${fmtMoney(m.feed_in)}</strong></span>
+          <span>Super Export <strong class="credit">${fmtMoney(m.super_export)}</strong></span>
+          <span>ZeroHero <strong class="credit">${fmtMoney(m.zerohero)}</strong> · ${m.zerohero_days ?? 0}/${m.days ?? 0} days</span>
+        </div>` : ""}
+      </section>`;
+  }
+
+  private _renderTimeline(nowH: number, periods: TariffPeriod[] = TARIFF_PERIODS): string {
     const w = 100;
-    const bars = TARIFF_PERIODS.map(p => {
+    const bars = periods.map(p => {
       const pct  = ((p.end - p.start) / 24) * w;
       const left = (p.start / 24) * w;
       return `<div class="t-bar" title="${p.label} ${p.cost}"
@@ -1327,6 +1417,26 @@ h2 { margin: 0; font-size: 1.1rem; font-weight: 650; }
 .ov-lbl  { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; color: var(--secondary-text-color,#667085); }
 .ov-sub  { font-size: 0.68rem; color: var(--secondary-text-color,#667085); }
 
+/* Bill estimate */
+.bill-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.bill-stat {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px; border-radius: 8px;
+  border: 1px solid var(--divider-color,rgba(127,127,127,.18));
+  background: color-mix(in srgb, var(--primary-background-color,#f7f8fa) 70%, transparent);
+}
+.bill-net { font-size: 1.15rem; font-weight: 720; }
+.bill-row { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--secondary-text-color,#667085); }
+.bill-row strong { color: var(--primary-text-color,#1f2933); font-weight: 650; }
+.credit, .bill-row strong.credit { color: #16a34a; }
+.bill-net.owed { color: var(--primary-text-color,#1f2933); }
+.bill-breakdown {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px;
+  font-size: 0.72rem; color: var(--secondary-text-color,#667085);
+}
+.bill-breakdown strong { color: var(--primary-text-color,#1f2933); font-weight: 650; }
+.bill-breakdown strong.credit { color: #16a34a; }
+
 .data-notice {
   margin: 10px 0 0; font-size: 0.78rem;
   color: var(--secondary-text-color,#667085);
@@ -1336,6 +1446,7 @@ h2 { margin: 0; font-size: 1.1rem; font-weight: 650; }
 @media (max-width: 480px) {
   .two-col { grid-template-columns: 1fr; }
   .overnight-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .bill-grid { grid-template-columns: 1fr; }
   .t-header { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 `;
