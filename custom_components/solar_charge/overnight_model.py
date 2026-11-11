@@ -56,6 +56,23 @@ HOUSE_EMA_ALPHA = 0.2
 """Smoothing for the house-load estimate (≈5 min at a 60 s cycle), so a
 kettle doesn't end the export early."""
 
+# ── Export pacing ───────────────────────────────────────────────────────
+MAX_SELL_W = 12000
+"""Inverter max sell power outside the paced window (its normal setting)."""
+MIN_SELL_W = 3000
+"""Export headroom always kept while pacing. A load switching on is fed from
+this export instead of the grid while the battery ramps up (a few seconds),
+so it must cover a typical appliance step (oven element, kettle)."""
+SELL_STEP_W = 250
+"""Sell limit is rounded up to this step so it isn't rewritten every cycle."""
+
+# ── ZeroHero window meter ───────────────────────────────────────────────
+ZEROHERO_WINDOW_START = time(18, 0)
+ZEROHERO_WINDOW_END = time(21, 0)
+SUPER_EXPORT_MAX_KWH = 15.0
+METER_MAX_GAP = timedelta(minutes=5)
+"""Readings further apart than this are not integrated."""
+
 
 # ---------------------------------------------------------------------------
 # Night records
@@ -387,6 +404,96 @@ class ExportGuard:
             return False
         self.last_allowed = True
         return True
+
+    def sell_limit_w(
+        self, now: datetime, soc_pct: float | None, capacity_kwh: float
+    ) -> int:
+        """Inverter max sell power for this cycle (call after ``update``)."""
+        if self.latched_date == now.date().isoformat():
+            return MAX_SELL_W  # export stopped: slot is Zero Export anyway
+        return paced_sell_limit_w(now, soc_pct, self.last_stop_soc, capacity_kwh)
+
+
+def paced_sell_limit_w(
+    now: datetime,
+    soc_pct: float | None,
+    stop_soc: float | None,
+    capacity_kwh: float,
+) -> int:
+    """Export rate that spreads the exportable energy over 18:00–21:00.
+
+    Exporting flat out empties the export budget early and leaves the house
+    on Zero Export for the rest of the window, where every load step is
+    briefly fed from the grid (10 Nov: 0.17 kWh, ZeroHero lost). Pacing keeps
+    the grid exporting until 21:00, so steps eat into the export instead.
+
+    ``stop_soc`` already reserves the house load until 21:00, so the energy
+    above it is all exportable.
+    """
+    start = datetime.combine(now.date(), EXPORT_WINDOW_START, tzinfo=now.tzinfo)
+    end = datetime.combine(now.date(), EXPORT_WINDOW_END, tzinfo=now.tzinfo)
+    if not start <= now < end or soc_pct is None or stop_soc is None:
+        return MAX_SELL_W
+    remaining_h = max((end - now).total_seconds() / 3600.0, 1 / 60)
+    spare_kwh = max(0.0, (soc_pct - stop_soc) / 100.0 * capacity_kwh)
+    watts = spare_kwh / remaining_h * 1000.0
+    watts = math.ceil(watts / SELL_STEP_W) * SELL_STEP_W
+    return int(min(MAX_SELL_W, max(MIN_SELL_W, watts)))
+
+
+# ---------------------------------------------------------------------------
+# ZeroHero window meter
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class WindowMeter:
+    """Grid import / export in the 18:00–21:00 window.
+
+    Fed on every grid-power reading (state changes plus the control cycle),
+    each reading held until the next. Sampling only once a minute counted a
+    few-second load spike as a whole minute of import (10 Nov: 0.229 kWh vs
+    GloBird's 0.173 kWh).
+    """
+
+    date: str | None = None
+    import_kwh: float = 0.0
+    export_kwh: float = 0.0
+    last_at: datetime | None = None
+    last_w: float | None = None
+
+    def add(self, now: datetime, grid_w: float | None) -> bool:
+        """Record a reading (import positive). Returns True if totals changed."""
+        changed = False
+        today = now.date().isoformat()
+        start = datetime.combine(now.date(), ZEROHERO_WINDOW_START, tzinfo=now.tzinfo)
+        end = datetime.combine(now.date(), ZEROHERO_WINDOW_END, tzinfo=now.tzinfo)
+        if self.date != today and now >= start:
+            self.date = today
+            self.import_kwh = 0.0
+            self.export_kwh = 0.0
+            changed = True
+
+        prev_at, prev_w = self.last_at, self.last_w
+        if (
+            prev_at is not None
+            and prev_w is not None
+            and self.date == today
+            and timedelta(0) < now - prev_at <= METER_MAX_GAP
+        ):
+            lo, hi = max(prev_at, start), min(now, end)
+            if hi > lo:
+                kwh = prev_w / 1000.0 * (hi - lo).total_seconds() / 3600.0
+                if kwh > 0:
+                    self.import_kwh += kwh
+                    changed = True
+                elif kwh < 0:
+                    self.export_kwh = min(self.export_kwh - kwh, SUPER_EXPORT_MAX_KWH)
+                    changed = True
+
+        if prev_at is None or now >= prev_at:
+            self.last_at, self.last_w = now, grid_w
+        return changed
 
 
 def _opt_float(value: Any) -> float | None:

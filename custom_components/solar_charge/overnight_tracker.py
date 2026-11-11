@@ -8,7 +8,7 @@ progress, and tracks grid energy in the GloBird ZeroHero window
 
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import datetime
 import logging
 from typing import Any
 
@@ -19,6 +19,7 @@ from .overnight_model import (
     ExportGuard,
     NightAccumulator,
     NightRecord,
+    WindowMeter,
     design_night_kwh,
     reserve_pct,
 )
@@ -30,12 +31,7 @@ STORAGE_VERSION = 1
 SAVE_DELAY_S = 60
 
 # ZeroHero: imports must average ≤ 0.03 kWh/h over 3 hours = 0.09 kWh total
-ZEROHERO_WINDOW_START = time(18, 0)
-ZEROHERO_WINDOW_END = time(21, 0)
 ZEROHERO_MAX_IMPORT_KWH = 0.09
-
-# Super Export: first 15 kWh exported 6pm–9pm earns the bonus
-SUPER_EXPORT_MAX_KWH = 15.0
 
 
 class OvernightTracker:
@@ -58,11 +54,8 @@ class OvernightTracker:
         self.nights = NightAccumulator()
         self.export_guard = ExportGuard()
 
-        # ZeroHero / Super Export accumulators (reset each day at 18:00)
-        self._window_date: str | None = None
-        self.zerohero_import_kwh: float = 0.0
-        self.super_export_kwh: float = 0.0
-        self._prev_update_time: datetime | None = None
+        # ZeroHero / Super Export energy (reset each day at 18:00)
+        self.window = WindowMeter()
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -79,9 +72,11 @@ class OvernightTracker:
         if isinstance(data, dict):
             self.nights = NightAccumulator.from_dict(data.get("overnight"))
             zh = data.get("zerohero") or {}
-            self._window_date = zh.get("date")
-            self.zerohero_import_kwh = float(zh.get("import_kwh", 0.0))
-            self.super_export_kwh = float(zh.get("export_kwh", 0.0))
+            self.window = WindowMeter(
+                date=zh.get("date"),
+                import_kwh=float(zh.get("import_kwh", 0.0)),
+                export_kwh=float(zh.get("export_kwh", 0.0)),
+            )
             if "snapshots" in data and "overnight" not in data:
                 _LOGGER.info(
                     "Discarding legacy overnight snapshots (measured daytime "
@@ -94,9 +89,9 @@ class OvernightTracker:
         return {
             "overnight": self.nights.as_dict(),
             "zerohero": {
-                "date": self._window_date,
-                "import_kwh": self.zerohero_import_kwh,
-                "export_kwh": self.super_export_kwh,
+                "date": self.window.date,
+                "import_kwh": self.window.import_kwh,
+                "export_kwh": self.window.export_kwh,
             },
         }
 
@@ -125,9 +120,30 @@ class OvernightTracker:
         if was_active or self.nights.active is not None or finished is not None:
             self._schedule_save()
 
-        current_time = now.timetz().replace(tzinfo=None)
-        if self._update_energy_window(now, now.date().isoformat(), current_time, grid_power_w):
+        self.record_grid(now, grid_power_w)
+
+    def record_grid(self, now: datetime, grid_power_w: float | None) -> None:
+        """Feed a grid-power reading (positive = import) to the window meter.
+
+        Called on every grid sensor state change as well as each cycle, so
+        short load spikes are measured at the sensor's own resolution.
+        """
+        if self._loaded and self.window.add(now, grid_power_w):
             self._schedule_save()
+
+    @property
+    def zerohero_import_kwh(self) -> float:
+        return self.window.import_kwh
+
+    @property
+    def super_export_kwh(self) -> float:
+        return self.window.export_kwh
+
+    def sell_limit_w(self, now: datetime, battery_soc_pct: float | None) -> int:
+        """Paced inverter max sell power (after ``export_allowed``)."""
+        return self.export_guard.sell_limit_w(
+            now, battery_soc_pct, self.battery_capacity_kwh
+        )
 
     def export_allowed(
         self,
@@ -209,42 +225,3 @@ class OvernightTracker:
                 night.date,
                 night.reason or "implausible reading",
             )
-
-    def _update_energy_window(
-        self,
-        now: datetime,
-        today: str,
-        current_time: time,
-        grid_power_w: float | None,
-    ) -> bool:
-        """Accumulate grid energy in the ZeroHero window. Returns True if changed."""
-        in_window = ZEROHERO_WINDOW_START <= current_time < ZEROHERO_WINDOW_END
-        changed = False
-
-        if self._window_date != today and in_window:
-            self.zerohero_import_kwh = 0.0
-            self.super_export_kwh = 0.0
-            self._window_date = today
-            changed = True
-        elif self._window_date != today and current_time >= ZEROHERO_WINDOW_END:
-            self._window_date = today
-
-        if (
-            in_window
-            and self._prev_update_time is not None
-            and grid_power_w is not None
-        ):
-            elapsed_h = (now - self._prev_update_time).total_seconds() / 3600.0
-            if 0 < elapsed_h < (5 / 60):
-                if grid_power_w > 0:
-                    self.zerohero_import_kwh += (grid_power_w / 1000.0) * elapsed_h
-                    changed = True
-                elif grid_power_w < 0:
-                    exported = (-grid_power_w / 1000.0) * elapsed_h
-                    self.super_export_kwh = min(
-                        self.super_export_kwh + exported, SUPER_EXPORT_MAX_KWH
-                    )
-                    changed = True
-
-        self._prev_update_time = now
-        return changed

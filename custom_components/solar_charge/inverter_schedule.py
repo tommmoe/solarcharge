@@ -141,6 +141,9 @@ def calculate_inverter_schedule(inputs: InverterScheduleInputs) -> list[Inverter
         #   • Export stops (export_allowed=False) once SOC reaches floor +
         #     overnight need + rest-of-evening house load; the battery then
         #     keeps carrying the house to 21:00 and through the night
+        #   • Export is paced to last until 21:00 via the inverter's max sell
+        #     power (coordinator → ExportGuard.sell_limit_w), so load steps
+        #     are fed from the export instead of the grid
         #   • Earning up to 15c + 5c = 20c/kWh on first 15 kWh exported
         #   • Keeping grid import ≤ 0.09 kWh total earns the $1/day credit
         #   • sell=True is required: without the slot's sell flag the battery

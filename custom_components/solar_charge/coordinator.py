@@ -12,8 +12,11 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant, State, callback
-from homeassistant.helpers.event import async_track_point_in_utc_time
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, State, callback
+from homeassistant.helpers.event import (
+    async_track_point_in_utc_time,
+    async_track_state_change_event,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -104,6 +107,8 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.sensor_ages: dict[str, float | None] = {}
         self.last_error: str | None = None
         self._snooze_unsub: CALLBACK_TYPE | None = None
+        self._grid_unsub: CALLBACK_TYPE | None = None
+        self._grid_tracked: str | None = None
         self.refresh_settings()
 
         super().__init__(
@@ -281,12 +286,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             stale_after_s = float(self._settings[CONF_SENSOR_STALE_SECONDS])
 
             grid_state = self._state(self._settings.get(CONF_GRID_POWER_ENTITY))
-            grid_power_w = self._numeric_state(
-                grid_state,
-                multiplier=float(self._settings[CONF_GRID_POWER_MULTIPLIER]),
-            )
-            if grid_power_w is not None and not self._settings[CONF_GRID_IMPORT_POSITIVE]:
-                grid_power_w *= -1
+            grid_power_w = self._grid_power_w(grid_state)
 
             pv_power_w = self._sum_states(
                 self._settings.get(CONF_PV_POWER_ENTITIES) or [],
@@ -490,13 +490,17 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 reserve=overnight_reserve_pct,
             )
 
+            sell_limit_w = self.overnight_tracker.sell_limit_w(now, battery_soc_pct)
+
             inverter_slots = calculate_inverter_schedule(
                 InverterScheduleInputs(
                     overnight_reserve_pct=overnight_reserve_pct,
                     export_allowed=export_allowed,
                 )
             )
-            await self.inverter_controller.async_apply_schedule(inverter_slots)
+            await self.inverter_controller.async_apply_schedule(
+                inverter_slots, sell_limit_w=sell_limit_w
+            )
 
             now_time = now.timetz().replace(tzinfo=None)
             active_slot_idx = current_slot_index(now_time, inverter_slots)
@@ -523,6 +527,7 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     ),
                     "export_stop_soc": self.overnight_tracker.export_guard.last_stop_soc,
                     "export_allowed": export_allowed,
+                    "export_sell_limit_w": sell_limit_w,
                     "house_power_w": house_w,
                     "overnight_snapshot_count": self.overnight_tracker.snapshot_count,
                     "zerohero_import_kwh": round(
@@ -588,6 +593,47 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.latest_raw_states[entity_id] = _state_as_dict(state)
         self.sensor_ages[entity_id] = self._state_age_seconds(state)
         return state
+
+    def _grid_power_w(self, state: State | None) -> float | None:
+        """Grid power in W from the configured sensor, import positive."""
+        value = self._numeric_state(
+            state, multiplier=float(self._settings[CONF_GRID_POWER_MULTIPLIER])
+        )
+        if value is not None and not self._settings[CONF_GRID_IMPORT_POSITIVE]:
+            value *= -1
+        return value
+
+    @callback
+    def async_track_grid(self) -> None:
+        """Meter the ZeroHero window on every grid sensor change.
+
+        The control cycle only samples once a minute, which counted a
+        few-second load spike as a full minute of import.
+        """
+        entity_id = self._settings.get(CONF_GRID_POWER_ENTITY) or None
+        if entity_id == self._grid_tracked and self._grid_unsub is not None:
+            return
+        self.async_untrack_grid()
+        if entity_id is None:
+            return
+
+        @callback
+        def _changed(event: Event) -> None:
+            self.overnight_tracker.record_grid(
+                dt_util.now(), self._grid_power_w(event.data.get("new_state"))
+            )
+
+        self._grid_unsub = async_track_state_change_event(
+            self.hass, [entity_id], _changed
+        )
+        self._grid_tracked = entity_id
+
+    @callback
+    def async_untrack_grid(self) -> None:
+        if self._grid_unsub is not None:
+            self._grid_unsub()
+            self._grid_unsub = None
+        self._grid_tracked = None
 
     def _numeric_state(
         self,

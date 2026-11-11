@@ -51,12 +51,14 @@ class InverterController:
         self,
         slots: list[InverterSlot],
         force: bool = False,
+        sell_limit_w: int | None = None,
     ) -> None:
         """Write the schedule to the inverter entities if anything has changed.
 
         Args:
             slots: Exactly 6 InverterSlot objects in prog1→prog6 order.
             force: Write all entities regardless of cached state.
+            sell_limit_w: Inverter max sell power (paces the evening export).
         """
         settings = self.coordinator.settings
 
@@ -81,6 +83,9 @@ class InverterController:
         # slot. Deye Cloud used to toggle it; now we keep it in step with the
         # active slot's load limit.
         await self._manage_solar_export(prefix, slots)
+
+        if sell_limit_w is not None:
+            await self._manage_sell_limit(prefix, sell_limit_w)
 
     # ------------------------------------------------------------------
     # Slot writing
@@ -233,6 +238,41 @@ class InverterController:
             f"Solar export {state.state} → {target}",
             service=f"switch.turn_{target}",
             entity_id=entity_id,
+        )
+
+    async def _manage_sell_limit(self, prefix: str, watts: int) -> None:
+        """Keep the inverter's max sell power at the paced export rate.
+
+        Optional entity: add-on configs without ``max_sell_power`` just
+        export unpaced.
+        """
+        entity_id = f"number.{prefix}_max_sell_power"
+        state = self.hass.states.get(entity_id)
+        if state is None or state.state in {STATE_UNKNOWN, STATE_UNAVAILABLE}:
+            _LOGGER.debug("Max sell power entity not available: %s", entity_id)
+            return
+        try:
+            current = float(state.state)
+        except (TypeError, ValueError):
+            current = None
+        if current is not None and abs(current - watts) < 0.5:
+            return
+        try:
+            await self.hass.services.async_call(
+                "number",
+                "set_value",
+                {"entity_id": entity_id, "value": float(watts)},
+                blocking=True,
+            )
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.warning("Failed to set max sell power (%s): %s", entity_id, err)
+            return
+        _LOGGER.info("Max sell power: %s → %s W", state.state, watts)
+        self._record(
+            f"Max sell power {state.state} → {watts} W",
+            service="number.set_value",
+            entity_id=entity_id,
+            value=watts,
         )
 
     # ------------------------------------------------------------------

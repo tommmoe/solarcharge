@@ -116,6 +116,7 @@
       "overnight_design_kwh": { "name": "Overnight planned usage" },
       "overnight_last_night_kwh": { "name": "Last night usage" },
       "export_stop_soc": { "name": "Export stop SOC" },
+      "export_sell_limit": { "name": "Export sell limit" },
       "house_power": { "name": "House power" },
       "overnight_snapshot_count": { "name": "Overnight nights measured" },
       "zerohero_import_kwh": { "name": "ZeroHero import (today)" },

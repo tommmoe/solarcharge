@@ -176,6 +176,14 @@ SENSORS: tuple[SolarChargeSensorDescription, ...] = (
         value_fn=lambda data: data.get("export_stop_soc"),
     ),
     SolarChargeSensorDescription(
+        key="export_sell_limit",
+        translation_key="export_sell_limit",
+        native_unit_of_measurement="W",
+        device_class=SensorDeviceClass.POWER,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("export_sell_limit_w"),
+    ),
+    SolarChargeSensorDescription(
         key="house_power",
         translation_key="house_power",
         native_unit_of_measurement="W",

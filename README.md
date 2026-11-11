@@ -70,8 +70,9 @@ Deye/Sunsynk:
 
 Inverter control (18:00–21:00 export) also needs the Sunsynk add-on to poll
 the per-slot sell flags. Add these to the add-on's `SENSORS` list:
-`prog1_sell` … `prog6_sell` (and optionally `max_sell_power`). Without
-`prog5_sell` the battery idles in Allow Export mode and the house runs on grid.
+`prog1_sell` … `prog6_sell` and `max_sell_power`. Without `prog5_sell` the
+battery idles in Allow Export mode and the house runs on grid. Without
+`max_sell_power` the export isn't paced (see below).
 
 Beny/OCPP:
 
@@ -105,9 +106,19 @@ The 18:00–21:00 export must leave enough battery to carry the house to the
   10 % + reserve + the house load still expected before 21:00. The battery
   then keeps powering the house, so the grid isn't used and the ZeroHero
   credit is kept.
+- **Pacing the export:** the inverter's max sell power is set each cycle to
+  spread the energy above the stop SOC evenly until 21:00 (never below 3 kW,
+  12 kW outside the window). The grid keeps exporting for the whole window,
+  so when a load switches on it is fed from the export while the battery
+  ramps up, not from the grid. Exporting flat out and then sitting at Zero
+  Export for the last hour let a cycling oven import 0.17 kWh on 10 Nov 2026
+  and lose the credit.
+- **Metering the window:** ZeroHero import and Super Export are integrated on
+  every grid sensor change, not once per control cycle, so a few-second spike
+  isn't counted as a whole minute.
 
 Sensors: *Overnight planned usage*, *Last night usage*, *Overnight reserve*,
-*Export stop SOC*, *House power*, *Overnight nights measured*, and binary
+*Export stop SOC*, *Export sell limit*, *House power*, *Overnight nights measured*, and binary
 sensors *Evening export allowed* / *Overnight reserve using fallback*.
 
 ## Installation

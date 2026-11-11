@@ -335,3 +335,86 @@ def test_dst_change_night_ends_at_local_11am() -> None:
     assert acc.update(datetime(2027, 4, 4, 10, 59, tzinfo=syd), 30.0, 0.0) is None
     rec = acc.update(datetime(2027, 4, 4, 11, 0, tzinfo=syd), 30.0, 0.0)
     assert rec is not None and rec.soc_end == 30.0
+
+
+# ---------------------------------------------------------------------------
+# Export pacing
+# ---------------------------------------------------------------------------
+
+
+def test_pacing_spreads_export_to_21() -> None:
+    # 10 Nov: 70 % at 18:00, stop ≈ 32 % → 18.2 kWh over 3 h ≈ 6.1 kW
+    w = om.paced_sell_limit_w(dt(10, 18), 70.0, 32.0, CAP)
+    assert w == 6250
+    # Halfway, on pace: same rate
+    assert om.paced_sell_limit_w(dt(10, 19, 30), 51.0, 32.0, CAP) == 6250
+
+
+def test_pacing_keeps_minimum_headroom() -> None:
+    assert om.paced_sell_limit_w(dt(10, 20, 30), 33.0, 32.0, CAP) == om.MIN_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 19), 30.0, 32.0, CAP) == om.MIN_SELL_W
+
+
+def test_pacing_caps_and_is_unpaced_outside_window() -> None:
+    assert om.paced_sell_limit_w(dt(10, 20, 59), 90.0, 30.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 17, 59), 70.0, 32.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 21), 70.0, 32.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 18), None, 32.0, CAP) == om.MAX_SELL_W
+
+
+def test_guard_sell_limit_unpaced_once_latched() -> None:
+    g = om.ExportGuard()
+    assert g.update(dt(10, 18), 70.0, 1000.0, 18, CAP)
+    assert g.sell_limit_w(dt(10, 18), 70.0, CAP) < om.MAX_SELL_W
+    assert not g.update(dt(10, 20), 20.0, 1000.0, 18, CAP)
+    assert g.sell_limit_w(dt(10, 20), 20.0, CAP) == om.MAX_SELL_W
+
+
+# ---------------------------------------------------------------------------
+# ZeroHero window meter
+# ---------------------------------------------------------------------------
+
+
+def test_meter_counts_short_spike_for_its_duration() -> None:
+    m = om.WindowMeter()
+    m.add(dt(10, 20, 17, 0), 20.0)
+    m.add(dt(10, 20, 17, 49), 1370.0)  # spike reported
+    m.add(dt(10, 20, 18, 7), 20.0)  # gone 18 s later
+    m.add(dt(10, 20, 18, 49), 20.0)
+    spike = 1.37 * 18 / 3600
+    base = 0.02 * (49 + 42) / 3600
+    assert m.import_kwh == pytest.approx(spike + base)
+
+
+def test_meter_clips_to_window_and_resets_daily() -> None:
+    m = om.WindowMeter()
+    m.add(dt(10, 17, 59), 600.0)
+    m.add(dt(10, 18, 1), 600.0)  # only 18:00–18:01 counts
+    assert m.import_kwh == pytest.approx(0.01)
+    m.add(dt(10, 20, 59), -6000.0)
+    m.add(dt(10, 21, 1), 0.0)  # only 20:59–21:00 counts
+    assert m.export_kwh == pytest.approx(0.1)
+    m.add(dt(11, 18, 0), 0.0)
+    assert m.import_kwh == 0.0 and m.export_kwh == 0.0
+
+
+def test_meter_skips_gaps_and_unknown() -> None:
+    m = om.WindowMeter()
+    m.add(dt(10, 18, 0), 1000.0)
+    m.add(dt(10, 18, 10), 1000.0)  # 10 min gap: not counted
+    assert m.import_kwh == 0.0
+    m.add(dt(10, 18, 11), None)  # 18:10 reading held until now
+    assert m.import_kwh == pytest.approx(1 / 60)
+    m.add(dt(10, 18, 12), 1000.0)  # unknown minute: not counted
+    assert m.import_kwh == pytest.approx(1 / 60)
+    m.add(dt(10, 18, 13), 0.0)
+    assert m.import_kwh == pytest.approx(2 / 60)
+
+
+def test_meter_super_export_capped() -> None:
+    m = om.WindowMeter()
+    t = dt(10, 18)
+    m.add(t, -12000.0)
+    for i in range(1, 100):
+        m.add(t + timedelta(minutes=i), -12000.0)
+    assert m.export_kwh == om.SUPER_EXPORT_MAX_KWH
