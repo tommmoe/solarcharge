@@ -490,7 +490,9 @@ class SolarChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 reserve=overnight_reserve_pct,
             )
 
-            sell_limit_w = self.overnight_tracker.sell_limit_w(now, battery_soc_pct)
+            sell_limit_w = self.overnight_tracker.sell_limit_w(
+                now, battery_soc_pct, house_w
+            )
 
             inverter_slots = calculate_inverter_schedule(
                 InverterScheduleInputs(

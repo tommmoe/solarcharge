@@ -343,31 +343,37 @@ def test_dst_change_night_ends_at_local_11am() -> None:
 
 
 def test_pacing_spreads_export_to_21() -> None:
-    # 10 Nov: 70 % at 18:00, stop ≈ 32 % → 18.2 kWh over 3 h ≈ 6.1 kW
-    w = om.paced_sell_limit_w(dt(10, 18), 70.0, 32.0, CAP)
-    assert w == 6250
+    # 70 % at 18:00, stop 32 % → 18.24 kWh over 3 h = 6.08 kW export,
+    # + 1 kW house = 7.08 kW → rounded up to 7250
+    assert om.paced_sell_limit_w(dt(10, 18), 70.0, 32.0, 1000.0, CAP) == 7250
     # Halfway, on pace: same rate
-    assert om.paced_sell_limit_w(dt(10, 19, 30), 51.0, 32.0, CAP) == 6250
+    assert om.paced_sell_limit_w(dt(10, 19, 30), 51.0, 32.0, 1000.0, CAP) == 7250
 
 
-def test_pacing_keeps_minimum_headroom() -> None:
-    assert om.paced_sell_limit_w(dt(10, 20, 30), 33.0, 32.0, CAP) == om.MIN_SELL_W
-    assert om.paced_sell_limit_w(dt(10, 19), 30.0, 32.0, CAP) == om.MIN_SELL_W
+def test_pacing_covers_house_load_plus_headroom() -> None:
+    # 11 Nov: little to export, a 4 kW oven on. The cap must exceed the
+    # house load, or the grid supplies the difference.
+    w = om.paced_sell_limit_w(dt(11, 18, 15), 50.0, 49.0, 4000.0, CAP)
+    assert w >= 4000 + om.STEP_HEADROOM_W
+    # Nothing left to export: still house + headroom
+    assert om.paced_sell_limit_w(dt(10, 19), 30.0, 32.0, 800.0, CAP) == 3500
+    # Unknown house load: assume the default
+    assert om.paced_sell_limit_w(dt(10, 19), 30.0, 32.0, None, CAP) == 5500
 
 
 def test_pacing_caps_and_is_unpaced_outside_window() -> None:
-    assert om.paced_sell_limit_w(dt(10, 20, 59), 90.0, 30.0, CAP) == om.MAX_SELL_W
-    assert om.paced_sell_limit_w(dt(10, 17, 59), 70.0, 32.0, CAP) == om.MAX_SELL_W
-    assert om.paced_sell_limit_w(dt(10, 21), 70.0, 32.0, CAP) == om.MAX_SELL_W
-    assert om.paced_sell_limit_w(dt(10, 18), None, 32.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 20, 59), 90.0, 30.0, 1000.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 17, 59), 70.0, 32.0, 1000.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 21), 70.0, 32.0, 1000.0, CAP) == om.MAX_SELL_W
+    assert om.paced_sell_limit_w(dt(10, 18), None, 32.0, 1000.0, CAP) == om.MAX_SELL_W
 
 
 def test_guard_sell_limit_unpaced_once_latched() -> None:
     g = om.ExportGuard()
     assert g.update(dt(10, 18), 70.0, 1000.0, 18, CAP)
-    assert g.sell_limit_w(dt(10, 18), 70.0, CAP) < om.MAX_SELL_W
+    assert g.sell_limit_w(dt(10, 18), 70.0, 1000.0, CAP) < om.MAX_SELL_W
     assert not g.update(dt(10, 20), 20.0, 1000.0, 18, CAP)
-    assert g.sell_limit_w(dt(10, 20), 20.0, CAP) == om.MAX_SELL_W
+    assert g.sell_limit_w(dt(10, 20), 20.0, 1000.0, CAP) == om.MAX_SELL_W
 
 
 # ---------------------------------------------------------------------------

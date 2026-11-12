@@ -59,10 +59,13 @@ kettle doesn't end the export early."""
 # ── Export pacing ───────────────────────────────────────────────────────
 MAX_SELL_W = 12000
 """Inverter max sell power outside the paced window (its normal setting)."""
-MIN_SELL_W = 3000
-"""Export headroom always kept while pacing. A load switching on is fed from
-this export instead of the grid while the battery ramps up (a few seconds),
-so it must cover a typical appliance step (oven element, kettle)."""
+STEP_HEADROOM_W = 2500
+"""Minimum export while pacing, i.e. inverter output kept above the house
+load. Max sell power
+caps the inverter's *total* output (house + export), not just the export, so
+a load switching on is only covered by this headroom until the next cycle
+re-reads the house load (11 Nov: a 3 kW cap with a 4 kW oven imported
+0.08 kWh in 6 min)."""
 SELL_STEP_W = 250
 """Sell limit is rounded up to this step so it isn't rewritten every cycle."""
 
@@ -406,29 +409,39 @@ class ExportGuard:
         return True
 
     def sell_limit_w(
-        self, now: datetime, soc_pct: float | None, capacity_kwh: float
+        self,
+        now: datetime,
+        soc_pct: float | None,
+        house_w: float | None,
+        capacity_kwh: float,
     ) -> int:
         """Inverter max sell power for this cycle (call after ``update``)."""
         if self.latched_date == now.date().isoformat():
             return MAX_SELL_W  # export stopped: slot is Zero Export anyway
-        return paced_sell_limit_w(now, soc_pct, self.last_stop_soc, capacity_kwh)
+        return paced_sell_limit_w(
+            now, soc_pct, self.last_stop_soc, house_w, capacity_kwh
+        )
 
 
 def paced_sell_limit_w(
     now: datetime,
     soc_pct: float | None,
     stop_soc: float | None,
+    house_w: float | None,
     capacity_kwh: float,
 ) -> int:
-    """Export rate that spreads the exportable energy over 18:00–21:00.
+    """Inverter output cap that spreads the export over 18:00–21:00.
 
     Exporting flat out empties the export budget early and leaves the house
     on Zero Export for the rest of the window, where every load step is
     briefly fed from the grid (10 Nov: 0.17 kWh, ZeroHero lost). Pacing keeps
     the grid exporting until 21:00, so steps eat into the export instead.
 
-    ``stop_soc`` already reserves the house load until 21:00, so the energy
-    above it is all exportable.
+    The Deye's max sell power caps total inverter output, so the limit is
+    house load + export, and the export (the margin a load step can use
+    before the grid does) is never below ``STEP_HEADROOM_W``. ``stop_soc``
+    already reserves the house load until 21:00, so the energy above it is
+    all exportable.
     """
     start = datetime.combine(now.date(), EXPORT_WINDOW_START, tzinfo=now.tzinfo)
     end = datetime.combine(now.date(), EXPORT_WINDOW_END, tzinfo=now.tzinfo)
@@ -436,9 +449,10 @@ def paced_sell_limit_w(
         return MAX_SELL_W
     remaining_h = max((end - now).total_seconds() / 3600.0, 1 / 60)
     spare_kwh = max(0.0, (soc_pct - stop_soc) / 100.0 * capacity_kwh)
-    watts = spare_kwh / remaining_h * 1000.0
+    house = house_w if house_w is not None and house_w >= 0 else DEFAULT_HOUSE_KW * 1000
+    watts = house + max(spare_kwh / remaining_h * 1000.0, STEP_HEADROOM_W)
     watts = math.ceil(watts / SELL_STEP_W) * SELL_STEP_W
-    return int(min(MAX_SELL_W, max(MIN_SELL_W, watts)))
+    return int(min(MAX_SELL_W, watts))
 
 
 # ---------------------------------------------------------------------------

@@ -106,11 +106,13 @@ The 18:00–21:00 export must leave enough battery to carry the house to the
   10 % + reserve + the house load still expected before 21:00. The battery
   then keeps powering the house, so the grid isn't used and the ZeroHero
   credit is kept.
-- **Pacing the export:** the inverter's max sell power is set each cycle to
-  spread the energy above the stop SOC evenly until 21:00 (never below 3 kW,
-  12 kW outside the window). The grid keeps exporting for the whole window,
-  so when a load switches on it is fed from the export while the battery
-  ramps up, not from the grid. Exporting flat out and then sitting at Zero
+- **Pacing the export:** the Deye's max sell power caps the inverter's total
+  output (house + export). Each cycle it is set to the house load plus an
+  export that spreads the energy above the stop SOC evenly until 21:00, and
+  never less than 2.5 kW of export (12 kW outside the window). The grid keeps
+  exporting for the whole window, so when a load switches on it is fed from
+  the export, not from the grid. (11 Nov 2026: a cap that ignored house load
+  let a 4 kW oven pull from the grid.) Exporting flat out and then sitting at Zero
   Export for the last hour let a cycling oven import 0.17 kWh on 10 Nov 2026
   and lose the credit.
 - **Metering the window:** ZeroHero import and Super Export are integrated on

@@ -139,10 +139,15 @@ class OvernightTracker:
     def super_export_kwh(self) -> float:
         return self.window.export_kwh
 
-    def sell_limit_w(self, now: datetime, battery_soc_pct: float | None) -> int:
+    def sell_limit_w(
+        self,
+        now: datetime,
+        battery_soc_pct: float | None,
+        house_w: float | None,
+    ) -> int:
         """Paced inverter max sell power (after ``export_allowed``)."""
         return self.export_guard.sell_limit_w(
-            now, battery_soc_pct, self.battery_capacity_kwh
+            now, battery_soc_pct, house_w, self.battery_capacity_kwh
         )
 
     def export_allowed(
